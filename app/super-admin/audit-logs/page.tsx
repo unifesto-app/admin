@@ -2,11 +2,13 @@
 import { useEffect, useState, useCallback } from 'react';
 import BrandButton from '../components/BrandButton';
 import { BrandInput, BrandSelect } from '../components/BrandInput';
-import { adminApi, ApiResponse } from '../lib/api';
+import { useToast } from '../components/ToastProvider';
+import { adminApi, ApiResponse } from '@/lib/api';
 
 interface AuditLog { id: string; action: string; module: string; actor?: string; resource_id?: string; ip_address?: string; created_at: string; }
 
 export default function AuditLogsPage() {
+  const { showToast } = useToast();
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -32,6 +34,32 @@ export default function AuditLogsPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  const handleExportLogs = () => {
+    if (logs.length === 0) {
+      showToast('No logs to export', 'info');
+      return;
+    }
+
+    const header = ['id', 'action', 'module', 'actor', 'resource_id', 'ip_address', 'created_at'];
+    const lines = logs.map((l) => [
+      l.id,
+      l.action,
+      l.module,
+      l.actor ?? '',
+      l.resource_id ?? '',
+      l.ip_address ?? '',
+      l.created_at,
+    ]);
+    const csv = [header, ...lines].map((line) => line.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `audit-logs-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -39,7 +67,7 @@ export default function AuditLogsPage() {
           <h1 className="text-xl font-semibold text-black">Audit Logs</h1>
           <p className="text-sm text-zinc-400 mt-0.5">Full history of all admin and system-level actions.</p>
         </div>
-        <BrandButton variant="outline">Export Logs</BrandButton>
+        <BrandButton variant="outline" onClick={handleExportLogs}>Export Logs</BrandButton>
       </div>
 
       <div className="flex items-center gap-3 flex-wrap">

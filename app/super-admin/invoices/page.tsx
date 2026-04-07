@@ -2,7 +2,9 @@
 import { useEffect, useState, useCallback } from 'react';
 import BrandButton from '../components/BrandButton';
 import { BrandInput, BrandSelect } from '../components/BrandInput';
-import { financeApi, ApiResponse } from '../lib/api';
+import Modal from '../components/Modal';
+import { useToast } from '../components/ToastProvider';
+import { financeApi, ApiResponse } from '@/lib/api';
 
 interface Invoice { id: string; status: string; amount: number; due_date?: string; created_at: string; }
 
@@ -14,12 +16,17 @@ const statusColors: Record<string, string> = {
 };
 
 export default function InvoicesPage() {
+  const { showToast } = useToast();
   const [rows, setRows] = useState<Invoice[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newAmount, setNewAmount] = useState('');
+  const [newDueDate, setNewDueDate] = useState('');
+  const [saving, setSaving] = useState(false);
   const limit = 20;
 
   const load = useCallback(async () => {
@@ -36,9 +43,59 @@ export default function InvoicesPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  const handleExport = () => {
+    if (rows.length === 0) {
+      showToast('No invoices to export', 'info');
+      return;
+    }
+
+    const header = ['id', 'amount', 'due_date', 'status', 'created_at'];
+    const lines = rows.map((inv) => [inv.id, String(inv.amount), inv.due_date ?? '', inv.status, inv.created_at]);
+    const csv = [header, ...lines].map((line) => line.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `invoices-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleCreateInvoice = async () => {
+    const amount = Number(newAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      showToast('Enter a valid amount', 'error');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await financeApi.create('invoices', {
+        amount: Math.round(amount * 100),
+        status: 'unpaid',
+        due_date: newDueDate || undefined,
+      });
+      setShowCreateModal(false);
+      setNewAmount('');
+      setNewDueDate('');
+      await load();
+      showToast('Invoice created', 'success');
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : 'Failed to create invoice', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const updateStatus = async (id: string, newStatus: string) => {
-    try { await financeApi.updateStatus('invoices', id, newStatus); load(); }
-    catch { alert('Failed to update invoice'); }
+    try {
+      await financeApi.updateStatus('invoices', id, newStatus);
+      await load();
+      showToast('Invoice updated', 'success');
+    }
+    catch {
+      showToast('Failed to update invoice', 'error');
+    }
   };
 
   return (
@@ -49,8 +106,8 @@ export default function InvoicesPage() {
           <p className="text-sm text-zinc-400 mt-0.5">View and manage all invoices issued on the platform.</p>
         </div>
         <div className="flex gap-2">
-          <BrandButton variant="outline">Export</BrandButton>
-          <BrandButton>+ Create Invoice</BrandButton>
+          <BrandButton variant="outline" onClick={handleExport}>Export</BrandButton>
+          <BrandButton onClick={() => setShowCreateModal(true)}>+ Create Invoice</BrandButton>
         </div>
       </div>
 
@@ -114,6 +171,29 @@ export default function InvoicesPage() {
           <button onClick={() => setPage(p => p + 1)} disabled={page * limit >= total} className="px-3 py-1.5 border border-zinc-200 rounded-lg disabled:opacity-40">Next</button>
         </div>
       </div>
+
+      <Modal
+        open={showCreateModal}
+        title="Create Invoice"
+        confirmLabel="Create Invoice"
+        busy={saving}
+        onConfirm={handleCreateInvoice}
+        onCancel={() => {
+          if (saving) return;
+          setShowCreateModal(false);
+        }}
+      >
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs text-zinc-500 mb-1">Amount (INR)</label>
+            <BrandInput type="number" min="1" step="0.01" value={newAmount} onChange={(e) => setNewAmount(e.target.value)} placeholder="1999" />
+          </div>
+          <div>
+            <label className="block text-xs text-zinc-500 mb-1">Due Date (optional)</label>
+            <BrandInput type="date" value={newDueDate} onChange={(e) => setNewDueDate(e.target.value)} />
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

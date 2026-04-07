@@ -1,7 +1,15 @@
-import QuickActions from './components/QuickActions';
+'use client';
+import Link from 'next/link';
+import { API_BASE } from '@/lib/api';
 
-// Dashboard stats are fetched client-side via the API lib
-// See lib/api.ts for the full API client
+const actions = [
+  { label: 'Create New Event', href: '/super-admin/events' },
+  { label: 'Add User', href: '/super-admin/users' },
+  { label: 'Manage Roles', href: '/super-admin/roles' },
+  { label: 'View Analytics', href: '/super-admin/analytics' },
+  { label: 'Manage API Keys', href: '/super-admin/api-keys' },
+  { label: 'View Audit Logs', href: '/super-admin/audit-logs' },
+];
 
 export default function SuperAdminDashboard() {
   return (
@@ -33,15 +41,21 @@ export default function SuperAdminDashboard() {
 
         <div className="bg-white border border-zinc-200 rounded-xl p-5">
           <h2 className="text-sm font-semibold text-black mb-4">Quick Actions</h2>
-          <QuickActions />
+          <div className="space-y-2">
+            {actions.map((a) => (
+              <Link key={a.label} href={a.href}
+                className="flex items-center justify-between px-3 py-2.5 rounded-lg border border-zinc-100 hover:border-zinc-300 hover:bg-zinc-50 transition-all text-sm text-zinc-700">
+                {a.label}<span className="text-zinc-300">→</span>
+              </Link>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* API connection info */}
       <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
         <p className="text-xs font-semibold text-blue-700 mb-1">API Connected</p>
         <p className="text-xs text-blue-600">
-          Backend: <code className="bg-blue-100 px-1 rounded">{process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000'}</code>
+          Backend: <code className="bg-blue-100 px-1 rounded">{API_BASE}</code>
           {' '}— set <code className="bg-blue-100 px-1 rounded">NEXT_PUBLIC_API_URL</code> in <code className="bg-blue-100 px-1 rounded">.env.local</code> to point to your deployed API.
         </p>
       </div>

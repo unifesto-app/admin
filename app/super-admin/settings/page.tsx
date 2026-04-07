@@ -2,7 +2,9 @@
 import { useEffect, useState, useCallback } from 'react';
 import BrandButton from '../components/BrandButton';
 import { BrandInput, BrandSelect } from '../components/BrandInput';
-import { adminApi, ApiResponse } from '../lib/api';
+import Modal from '../components/Modal';
+import { useToast } from '../components/ToastProvider';
+import { adminApi, ApiResponse, API_BASE } from '@/lib/api';
 
 interface Settings {
   platform_name?: string; support_email?: string; timezone?: string; currency?: string;
@@ -12,11 +14,17 @@ interface Settings {
 }
 
 export default function SettingsPage() {
+  const { showToast } = useToast();
   const [settings, setSettings] = useState<Settings>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [showClearCache, setShowClearCache] = useState(false);
+  const [showReset, setShowReset] = useState(false);
+  const [dangerBusy, setDangerBusy] = useState(false);
+
+  const BASE = API_BASE;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -36,9 +44,55 @@ export default function SettingsPage() {
     try {
       await adminApi.update('settings', data);
       setSuccess(`${section} settings saved.`);
+      showToast(`${section} settings saved`, 'success');
       setTimeout(() => setSuccess(''), 3000);
     } catch (e: unknown) { setError(e instanceof Error ? e.message : 'Failed to save'); }
     finally { setSaving(''); }
+  };
+
+  const clearCache = async () => {
+    setDangerBusy(true);
+    try {
+      const res = await fetch(`${BASE}/api/admin/cache`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      const payload = await res.json().catch(() => ({} as { error?: string }));
+      if (!res.ok) throw new Error(payload.error ?? 'Failed to clear cache');
+      setShowClearCache(false);
+      showToast('Cache clear triggered successfully', 'success');
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : 'Failed to clear cache', 'error');
+    } finally {
+      setDangerBusy(false);
+    }
+  };
+
+  const resetSettings = async () => {
+    setDangerBusy(true);
+    try {
+      const defaults: Settings = {
+        platform_name: 'UNIFESTO',
+        support_email: '',
+        timezone: 'Asia/Kolkata',
+        currency: 'INR',
+        allow_registration: true,
+        require_email_verification: false,
+        allow_organizer_self_registration: false,
+        maintenance_mode: false,
+        smtp_host: '',
+        smtp_port: 587,
+        smtp_user: '',
+      };
+      await adminApi.update('settings', defaults as Record<string, unknown>);
+      setSettings(defaults);
+      setShowReset(false);
+      showToast('Settings reset to defaults', 'success');
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : 'Failed to reset settings', 'error');
+    } finally {
+      setDangerBusy(false);
+    }
   };
 
   const toggle = (key: keyof Settings) => {
@@ -116,7 +170,7 @@ export default function SettingsPage() {
             </div>
           ))}
         </div>
-        <BrandButton onClick={() => save('Access', { allow_registration: settings.allow_registration, require_email_verification: settings.require_email_verification, maintenance_mode: settings.maintenance_mode })} disabled={saving === 'Access'}>
+        <BrandButton onClick={() => save('Access', { allow_registration: settings.allow_registration, require_email_verification: settings.require_email_verification, allow_organizer_self_registration: settings.allow_organizer_self_registration, maintenance_mode: settings.maintenance_mode })} disabled={saving === 'Access'}>
           {saving === 'Access' ? 'Saving...' : 'Save Access Settings'}
         </BrandButton>
       </div>
@@ -155,16 +209,45 @@ export default function SettingsPage() {
             <p className="text-sm text-black font-medium">Clear all cached data</p>
             <p className="text-xs text-zinc-400">Flushes the application cache. This may temporarily slow down the platform.</p>
           </div>
-          <button className="px-3 py-1.5 border border-zinc-200 text-sm rounded-lg hover:border-red-400 hover:text-red-500 transition-colors text-zinc-600">Clear Cache</button>
+          <button onClick={() => setShowClearCache(true)} className="px-3 py-1.5 border border-zinc-200 text-sm rounded-lg hover:border-red-400 hover:text-red-500 transition-colors text-zinc-600">Clear Cache</button>
         </div>
         <div className="flex items-center justify-between py-2">
           <div>
             <p className="text-sm text-black font-medium">Reset platform settings</p>
             <p className="text-xs text-zinc-400">Resets all settings to factory defaults. This cannot be undone.</p>
           </div>
-          <button className="px-3 py-1.5 border border-red-200 text-sm rounded-lg hover:bg-red-50 transition-colors text-red-500">Reset Settings</button>
+          <button onClick={() => setShowReset(true)} className="px-3 py-1.5 border border-red-200 text-sm rounded-lg hover:bg-red-50 transition-colors text-red-500">Reset Settings</button>
         </div>
       </div>
+
+      <Modal
+        open={showClearCache}
+        title="Clear cached data?"
+        confirmLabel="Clear Cache"
+        busy={dangerBusy}
+        onConfirm={clearCache}
+        onCancel={() => {
+          if (dangerBusy) return;
+          setShowClearCache(false);
+        }}
+      >
+        <p className="text-sm text-zinc-500">This will invalidate cached responses and force fresh reads.</p>
+      </Modal>
+
+      <Modal
+        open={showReset}
+        title="Reset platform settings?"
+        confirmLabel="Reset"
+        danger
+        busy={dangerBusy}
+        onConfirm={resetSettings}
+        onCancel={() => {
+          if (dangerBusy) return;
+          setShowReset(false);
+        }}
+      >
+        <p className="text-sm text-zinc-500">This will overwrite current settings with defaults.</p>
+      </Modal>
     </div>
   );
 }

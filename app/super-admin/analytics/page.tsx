@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { usersApi, eventsApi, financeApi, ApiResponse } from '../lib/api';
+import { usersApi, eventsApi, financeApi, ApiResponse } from '@/lib/api';
 
 interface KPI { label: string; value: string | number; sub: string; }
 

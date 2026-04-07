@@ -2,11 +2,14 @@
 import { useEffect, useState, useCallback } from 'react';
 import BrandButton from '../components/BrandButton';
 import { BrandInput } from '../components/BrandInput';
-import { adminApi, ApiResponse } from '../lib/api';
+import Modal from '../components/Modal';
+import { useToast } from '../components/ToastProvider';
+import { adminApi, ApiResponse } from '@/lib/api';
 
 interface Category { id: string; name: string; slug: string; description?: string; events?: { count: number }[]; }
 
 export default function CategoriesPage() {
+  const { showToast } = useToast();
   const [cats, setCats] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -14,6 +17,7 @@ export default function CategoriesPage() {
   const [slug, setSlug] = useState('');
   const [desc, setDesc] = useState('');
   const [saving, setSaving] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true); setError('');
@@ -33,19 +37,24 @@ export default function CategoriesPage() {
   };
 
   const handleSave = async () => {
-    if (!name || !slug) { alert('Name and slug are required'); return; }
+    if (!name || !slug) { showToast('Name and slug are required', 'error'); return; }
     setSaving(true);
     try {
       await adminApi.create('categories', { name, slug, description: desc });
       setName(''); setSlug(''); setDesc(''); load();
-    } catch { alert('Failed to create category'); }
+      showToast('Category created', 'success');
+    } catch { showToast('Failed to create category', 'error'); }
     finally { setSaving(false); }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this category?')) return;
-    try { await adminApi.delete('categories', id); load(); }
-    catch { alert('Failed to delete category'); }
+    try {
+      await adminApi.delete('categories', id);
+      setDeleteId(null);
+      load();
+      showToast('Category deleted', 'success');
+    }
+    catch { showToast('Failed to delete category', 'error'); }
   };
 
   return (
@@ -103,13 +112,27 @@ export default function CategoriesPage() {
                 <td className="px-5 py-3 text-zinc-500 text-xs">{c.description ?? '—'}</td>
                 <td className="px-5 py-3 text-zinc-500 text-xs">{c.events?.[0]?.count ?? 0}</td>
                 <td className="px-5 py-3">
-                  <button onClick={() => handleDelete(c.id)} className="text-xs text-red-400 hover:text-red-600 transition-colors">Delete</button>
+                  <button onClick={() => setDeleteId(c.id)} className="text-xs text-red-400 hover:text-red-600 transition-colors">Delete</button>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      <Modal
+        open={Boolean(deleteId)}
+        title="Delete category?"
+        confirmLabel="Delete"
+        danger
+        onConfirm={() => {
+          if (!deleteId) return;
+          handleDelete(deleteId);
+        }}
+        onCancel={() => setDeleteId(null)}
+      >
+        <p className="text-sm text-zinc-500">This action cannot be undone.</p>
+      </Modal>
     </div>
   );
 }

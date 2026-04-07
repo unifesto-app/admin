@@ -2,7 +2,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import BrandButton from '../components/BrandButton';
 import { BrandInput, BrandSelect } from '../components/BrandInput';
-import { orgsApi, ApiResponse } from '../lib/api';
+import { useToast } from '../components/ToastProvider';
+import { orgsApi, ApiResponse } from '@/lib/api';
 
 interface Org { id: string; name: string; status: string; created_at: string; profiles?: { full_name: string; email: string }; }
 
@@ -13,6 +14,7 @@ const statusColors: Record<string, string> = {
 };
 
 export default function OrganizationsPage() {
+  const { showToast } = useToast();
   const [orgs, setOrgs] = useState<Org[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -47,13 +49,14 @@ export default function OrganizationsPage() {
     try {
       await orgsApi.create({ name: newName, owner_id: newOwner });
       setShowAdd(false); setNewName(''); setNewOwner(''); load();
-    } catch { alert('Failed to create organization'); }
+      showToast('Organization created', 'success');
+    } catch { showToast('Failed to create organization', 'error'); }
     finally { setSaving(false); }
   };
 
   const handleStatusChange = async (id: string, newStatus: string) => {
-    try { await orgsApi.update(id, { status: newStatus }); load(); }
-    catch { alert('Failed to update'); }
+    try { await orgsApi.update(id, { status: newStatus }); load(); showToast('Organization updated', 'success'); }
+    catch { showToast('Failed to update organization', 'error'); }
   };
 
   return (

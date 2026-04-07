@@ -2,11 +2,14 @@
 import { useEffect, useState, useCallback } from 'react';
 import BrandButton from '../components/BrandButton';
 import { BrandInput, BrandSelect } from '../components/BrandInput';
-import { adminApi, ApiResponse } from '../lib/api';
+import Modal from '../components/Modal';
+import { useToast } from '../components/ToastProvider';
+import { adminApi, ApiResponse } from '@/lib/api';
 
 interface ApiKey { id: string; name: string; permissions: string; expires_at?: string; last_used_at?: string; created_at: string; }
 
 export default function ApiKeysPage() {
+  const { showToast } = useToast();
   const [keys, setKeys] = useState<ApiKey[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -15,6 +18,7 @@ export default function ApiKeysPage() {
   const [permissions, setPermissions] = useState('read');
   const [expiry, setExpiry] = useState('never');
   const [generating, setGenerating] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true); setError('');
@@ -28,7 +32,7 @@ export default function ApiKeysPage() {
   useEffect(() => { load(); }, [load]);
 
   const handleGenerate = async () => {
-    if (!name) { alert('Key name is required'); return; }
+    if (!name) { showToast('Key name is required', 'error'); return; }
     setGenerating(true);
     try {
       const expiresAt = expiry === 'never' ? undefined
@@ -40,14 +44,19 @@ export default function ApiKeysPage() {
       if (res.data?.key) setNewKey(res.data.key);
       setName(''); setPermissions('read'); setExpiry('never');
       load();
-    } catch { alert('Failed to generate key'); }
+      showToast('API key generated', 'success');
+    } catch { showToast('Failed to generate key', 'error'); }
     finally { setGenerating(false); }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Revoke this API key? This cannot be undone.')) return;
-    try { await adminApi.delete('api-keys', id); load(); }
-    catch { alert('Failed to revoke key'); }
+    try {
+      await adminApi.delete('api-keys', id);
+      setDeleteId(null);
+      load();
+      showToast('API key revoked', 'success');
+    }
+    catch { showToast('Failed to revoke key', 'error'); }
   };
 
   return (
@@ -137,13 +146,27 @@ export default function ApiKeysPage() {
                 <td className="px-5 py-3 text-zinc-400 text-xs">{k.expires_at ? new Date(k.expires_at).toLocaleDateString() : 'Never'}</td>
                 <td className="px-5 py-3 text-zinc-400 text-xs">{k.last_used_at ? new Date(k.last_used_at).toLocaleDateString() : 'Never'}</td>
                 <td className="px-5 py-3">
-                  <button onClick={() => handleDelete(k.id)} className="text-xs text-red-400 hover:text-red-600 transition-colors">Revoke</button>
+                  <button onClick={() => setDeleteId(k.id)} className="text-xs text-red-400 hover:text-red-600 transition-colors">Revoke</button>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      <Modal
+        open={Boolean(deleteId)}
+        title="Revoke API key?"
+        confirmLabel="Revoke"
+        danger
+        onConfirm={() => {
+          if (!deleteId) return;
+          handleDelete(deleteId);
+        }}
+        onCancel={() => setDeleteId(null)}
+      >
+        <p className="text-sm text-zinc-500">This action cannot be undone.</p>
+      </Modal>
     </div>
   );
 }

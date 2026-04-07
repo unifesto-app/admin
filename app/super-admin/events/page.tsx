@@ -2,7 +2,9 @@
 import { useEffect, useState, useCallback } from 'react';
 import BrandButton from '../components/BrandButton';
 import { BrandInput, BrandSelect } from '../components/BrandInput';
-import { eventsApi, ApiResponse } from '../lib/api';
+import Modal from '../components/Modal';
+import { useToast } from '../components/ToastProvider';
+import { eventsApi, ApiResponse } from '@/lib/api';
 
 interface Event { id: string; title: string; status: string; category: string; start_date: string; created_by: string; }
 
@@ -15,6 +17,7 @@ const statusColors: Record<string, string> = {
 };
 
 export default function EventsPage() {
+  const { showToast } = useToast();
   const [events, setEvents] = useState<Event[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -23,6 +26,11 @@ export default function EventsPage() {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
   const [category, setCategory] = useState('');
+  const [newCategory, setNewCategory] = useState('');
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
+  const [newDate, setNewDate] = useState(new Date().toISOString().slice(0, 10));
+  const [saving, setSaving] = useState(false);
   const limit = 20;
 
   const load = useCallback(async () => {
@@ -42,8 +50,36 @@ export default function EventsPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  const handleCreateEvent = async () => {
+    if (!newTitle.trim()) {
+      showToast('Event title is required', 'error');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await eventsApi.create({ title: newTitle.trim(), start_date: newDate, status: 'draft', category: newCategory || null });
+      setShowCreateModal(false);
+      setNewTitle('');
+      setNewDate(new Date().toISOString().slice(0, 10));
+      setNewCategory('');
+      await load();
+      showToast('Event created', 'success');
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : 'Failed to create event', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleStatusChange = async (id: string, newStatus: string) => {
-    try { await eventsApi.update(id, { status: newStatus }); load(); } catch { alert('Failed to update event'); }
+    try {
+      await eventsApi.update(id, { status: newStatus });
+      await load();
+      showToast('Event updated', 'success');
+    } catch {
+      showToast('Failed to update event', 'error');
+    }
   };
 
   return (
@@ -53,7 +89,7 @@ export default function EventsPage() {
           <h1 className="text-xl font-semibold text-black">Events</h1>
           <p className="text-sm text-zinc-400 mt-0.5">Create and manage all events on the platform.</p>
         </div>
-        <BrandButton>+ New Event</BrandButton>
+        <BrandButton onClick={() => setShowCreateModal(true)}>+ New Event</BrandButton>
       </div>
 
       <div className="flex items-center gap-3 flex-wrap">
@@ -131,6 +167,39 @@ export default function EventsPage() {
             className="px-3 py-1.5 border border-zinc-200 rounded-lg disabled:opacity-40">Next</button>
         </div>
       </div>
+
+      <Modal
+        open={showCreateModal}
+        title="Create Event"
+        confirmLabel="Create Event"
+        busy={saving}
+        onConfirm={handleCreateEvent}
+        onCancel={() => {
+          if (saving) return;
+          setShowCreateModal(false);
+        }}
+      >
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs text-zinc-500 mb-1">Event Title</label>
+            <BrandInput type="text" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="Annual Summit 2026" />
+          </div>
+          <div>
+            <label className="block text-xs text-zinc-500 mb-1">Start Date</label>
+            <BrandInput type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)} />
+          </div>
+          <div>
+            <label className="block text-xs text-zinc-500 mb-1">Category</label>
+            <BrandSelect value={newCategory} onChange={(e) => setNewCategory(e.target.value)}>
+              <option value="">No category</option>
+              <option value="conference">Conference</option>
+              <option value="workshop">Workshop</option>
+              <option value="seminar">Seminar</option>
+              <option value="networking">Networking</option>
+            </BrandSelect>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

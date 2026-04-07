@@ -2,7 +2,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import BrandButton from '../components/BrandButton';
 import { BrandInput, BrandSelect } from '../components/BrandInput';
-import { financeApi, ApiResponse } from '../lib/api';
+import { useToast } from '../components/ToastProvider';
+import { financeApi, ApiResponse } from '@/lib/api';
 
 interface Transaction { id: string; status: string; amount: number; created_at: string; }
 
@@ -14,6 +15,7 @@ const statusColors: Record<string, string> = {
 };
 
 export default function TransactionsPage() {
+  const { showToast } = useToast();
   const [rows, setRows] = useState<Transaction[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -37,6 +39,24 @@ export default function TransactionsPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  const handleExportCsv = () => {
+    if (rows.length === 0) {
+      showToast('No rows to export', 'info');
+      return;
+    }
+
+    const header = ['id', 'amount', 'status', 'created_at'];
+    const lines = rows.map((t) => [t.id, String(t.amount), t.status, t.created_at]);
+    const csv = [header, ...lines].map((line) => line.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `transactions-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -44,7 +64,7 @@ export default function TransactionsPage() {
           <h1 className="text-xl font-semibold text-black">Transactions</h1>
           <p className="text-sm text-zinc-400 mt-0.5">All payment transactions across the platform.</p>
         </div>
-        <BrandButton variant="outline">Export CSV</BrandButton>
+        <BrandButton variant="outline" onClick={handleExportCsv}>Export CSV</BrandButton>
       </div>
 
       <div className="flex items-center gap-3 flex-wrap">

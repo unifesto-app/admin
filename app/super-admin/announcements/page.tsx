@@ -2,7 +2,9 @@
 import { useEffect, useState, useCallback } from 'react';
 import BrandButton from '../components/BrandButton';
 import { BrandInput, BrandSelect } from '../components/BrandInput';
-import { adminApi, ApiResponse } from '../lib/api';
+import Modal from '../components/Modal';
+import { useToast } from '../components/ToastProvider';
+import { adminApi, ApiResponse } from '@/lib/api';
 
 interface Announcement { id: string; title: string; message: string; audience: string; severity: string; created_at: string; }
 
@@ -13,6 +15,7 @@ const severityColors: Record<string, string> = {
 };
 
 export default function AnnouncementsPage() {
+  const { showToast } = useToast();
   const [list, setList] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -21,6 +24,7 @@ export default function AnnouncementsPage() {
   const [audience, setAudience] = useState('');
   const [severity, setSeverity] = useState('info');
   const [saving, setSaving] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true); setError('');
@@ -34,20 +38,25 @@ export default function AnnouncementsPage() {
   useEffect(() => { load(); }, [load]);
 
   const handlePublish = async () => {
-    if (!title || !message || !audience) { alert('Title, message and audience are required'); return; }
+    if (!title || !message || !audience) { showToast('Title, message and audience are required', 'error'); return; }
     setSaving(true);
     try {
       await adminApi.create('announcements', { title, message, audience, severity });
       setTitle(''); setMessage(''); setAudience(''); setSeverity('info');
       load();
-    } catch { alert('Failed to publish announcement'); }
+      showToast('Announcement published', 'success');
+    } catch { showToast('Failed to publish announcement', 'error'); }
     finally { setSaving(false); }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this announcement?')) return;
-    try { await adminApi.delete('announcements', id); load(); }
-    catch { alert('Failed to delete'); }
+    try {
+      await adminApi.delete('announcements', id);
+      setDeleteId(null);
+      load();
+      showToast('Announcement deleted', 'success');
+    }
+    catch { showToast('Failed to delete announcement', 'error'); }
   };
 
   return (
@@ -119,12 +128,26 @@ export default function AnnouncementsPage() {
                   <p className="text-xs text-zinc-500 mt-0.5 line-clamp-2">{a.message}</p>
                   <p className="text-xs text-zinc-400 mt-1">{new Date(a.created_at).toLocaleString()}</p>
                 </div>
-                <button onClick={() => handleDelete(a.id)} className="text-xs text-red-400 hover:text-red-600 transition-colors shrink-0">Delete</button>
+                <button onClick={() => setDeleteId(a.id)} className="text-xs text-red-400 hover:text-red-600 transition-colors shrink-0">Delete</button>
               </div>
             ))}
           </div>
         )}
       </div>
+
+      <Modal
+        open={Boolean(deleteId)}
+        title="Delete announcement?"
+        confirmLabel="Delete"
+        danger
+        onConfirm={() => {
+          if (!deleteId) return;
+          handleDelete(deleteId);
+        }}
+        onCancel={() => setDeleteId(null)}
+      >
+        <p className="text-sm text-zinc-500">This action cannot be undone.</p>
+      </Modal>
     </div>
   );
 }

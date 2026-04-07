@@ -2,11 +2,14 @@
 import { useEffect, useState, useCallback } from 'react';
 import BrandButton from '../components/BrandButton';
 import { BrandInput, BrandSelect } from '../components/BrandInput';
-import { usersApi, ApiResponse } from '../lib/api';
+import Modal from '../components/Modal';
+import { useToast } from '../components/ToastProvider';
+import { usersApi, ApiResponse } from '@/lib/api';
 
 interface User { id: string; full_name: string; email: string; role: string; status: string; created_at: string; }
 
 export default function UsersPage() {
+  const { showToast } = useToast();
   const [users, setUsers] = useState<User[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -15,6 +18,12 @@ export default function UsersPage() {
   const [search, setSearch] = useState('');
   const [role, setRole] = useState('');
   const [status, setStatus] = useState('');
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newEmail, setNewEmail] = useState('');
+  const [newFullName, setNewFullName] = useState('');
+  const [newRole, setNewRole] = useState('attendee');
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   const limit = 20;
 
   const load = useCallback(async () => {
@@ -37,9 +46,40 @@ export default function UsersPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  const handleAddUser = async () => {
+    if (!newEmail.trim()) {
+      showToast('Email is required', 'error');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await usersApi.create({ email: newEmail.trim(), full_name: newFullName.trim(), role: newRole });
+      setShowAddModal(false);
+      setNewEmail('');
+      setNewFullName('');
+      setNewRole('attendee');
+      await load();
+      showToast('User created successfully', 'success');
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : 'Failed to create user', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this user?')) return;
-    try { await usersApi.delete(id); load(); } catch { alert('Failed to delete user'); }
+    setSaving(true);
+    try {
+      await usersApi.delete(id);
+      setDeleteId(null);
+      await load();
+      showToast('User deleted', 'success');
+    } catch {
+      showToast('Failed to delete user', 'error');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -49,7 +89,7 @@ export default function UsersPage() {
           <h1 className="text-xl font-semibold text-black">Users</h1>
           <p className="text-sm text-zinc-400 mt-0.5">Manage all registered users and their access.</p>
         </div>
-        <BrandButton>+ Add User</BrandButton>
+        <BrandButton onClick={() => setShowAddModal(true)}>+ Add User</BrandButton>
       </div>
 
       <div className="flex items-center gap-3 flex-wrap">
@@ -105,7 +145,7 @@ export default function UsersPage() {
                 </td>
                 <td className="px-5 py-3 text-zinc-400 text-xs">{u.created_at ? new Date(u.created_at).toLocaleDateString() : '—'}</td>
                 <td className="px-5 py-3">
-                  <button onClick={() => handleDelete(u.id)} className="text-xs text-red-400 hover:text-red-600 transition-colors">Delete</button>
+                  <button onClick={() => setDeleteId(u.id)} className="text-xs text-red-400 hover:text-red-600 transition-colors">Delete</button>
                 </td>
               </tr>
             ))}
@@ -122,6 +162,55 @@ export default function UsersPage() {
             className="px-3 py-1.5 border border-zinc-200 rounded-lg hover:border-zinc-400 transition-colors disabled:opacity-40">Next</button>
         </div>
       </div>
+
+      <Modal
+        open={showAddModal}
+        title="Add User"
+        confirmLabel="Create User"
+        busy={saving}
+        onConfirm={handleAddUser}
+        onCancel={() => {
+          if (saving) return;
+          setShowAddModal(false);
+        }}
+      >
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs text-zinc-500 mb-1">Email</label>
+            <BrandInput type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="user@example.com" />
+          </div>
+          <div>
+            <label className="block text-xs text-zinc-500 mb-1">Full Name (optional)</label>
+            <BrandInput type="text" value={newFullName} onChange={(e) => setNewFullName(e.target.value)} placeholder="Jane Doe" />
+          </div>
+          <div>
+            <label className="block text-xs text-zinc-500 mb-1">Role</label>
+            <BrandSelect value={newRole} onChange={(e) => setNewRole(e.target.value)}>
+              <option value="super_admin">Admin</option>
+              <option value="organizer">Organizer</option>
+              <option value="attendee">Attendee</option>
+            </BrandSelect>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        open={Boolean(deleteId)}
+        title="Delete user?"
+        confirmLabel="Delete"
+        danger
+        busy={saving}
+        onConfirm={() => {
+          if (!deleteId) return;
+          handleDelete(deleteId);
+        }}
+        onCancel={() => {
+          if (saving) return;
+          setDeleteId(null);
+        }}
+      >
+        <p className="text-sm text-zinc-500">This action cannot be undone.</p>
+      </Modal>
     </div>
   );
 }

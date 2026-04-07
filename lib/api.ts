@@ -4,14 +4,27 @@ const PROD_API_BASE = 'https://api.unifesto.app';
 function normalizeBase(raw?: string) {
   const value = (raw ?? '').trim().replace(/\/+$/, '');
   if (!value) return '';
+  if (value === 'localhost:4000') return LOCAL_API_BASE;
   if (value === 'http://localhost:3001' || value === 'https://localhost:3001') return LOCAL_API_BASE;
+  if (!/^https?:\/\//i.test(value)) {
+    if (value.startsWith('localhost')) return `http://${value}`;
+    return `https://${value}`;
+  }
+  if (value.startsWith('http://') && !value.startsWith('http://localhost')) {
+    return value.replace('http://', 'https://');
+  }
   return value;
 }
 
 function getBaseCandidates() {
+  const isBrowser = typeof window !== 'undefined';
+  const isHttpsPage = isBrowser && window.location.protocol === 'https:';
+  const isProd = process.env.NODE_ENV === 'production';
   const envBase = normalizeBase(process.env.NEXT_PUBLIC_API_URL);
-  const defaultBase = process.env.NODE_ENV === 'production' ? PROD_API_BASE : LOCAL_API_BASE;
-  const ordered = [envBase, defaultBase, PROD_API_BASE, LOCAL_API_BASE].filter(Boolean);
+  const defaultBase = isProd ? PROD_API_BASE : LOCAL_API_BASE;
+  const ordered = [envBase, defaultBase, PROD_API_BASE, isProd ? '' : LOCAL_API_BASE]
+    .filter(Boolean)
+    .filter((base) => !(isHttpsPage && String(base).startsWith('http://')));
   return Array.from(new Set(ordered));
 }
 
@@ -23,9 +36,15 @@ export async function apiFetch<T = unknown>(path: string, options?: RequestInit)
 
   for (const base of candidates) {
     try {
+      const headers = new Headers(options?.headers);
+      const method = (options?.method ?? 'GET').toUpperCase();
+      if ((options?.body ?? null) !== null && method !== 'GET' && !headers.has('Content-Type')) {
+        headers.set('Content-Type', 'application/json');
+      }
+
       const res = await fetch(`${base}${path}`, {
         ...options,
-        headers: { 'Content-Type': 'application/json', ...options?.headers },
+        headers,
         credentials: 'include',
       });
 

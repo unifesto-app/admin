@@ -4,7 +4,7 @@ import BrandButton from '../components/BrandButton';
 import { BrandInput, BrandSelect } from '../components/BrandInput';
 import Modal from '../components/Modal';
 import { useToast } from '../components/ToastProvider';
-import { adminApi, ApiResponse, API_BASE } from '@/lib/api';
+import { adminApi, apiRequest, ApiResponse } from '@/lib/api';
 
 interface Settings {
   platform_name?: string; support_email?: string; timezone?: string; currency?: string;
@@ -23,8 +23,6 @@ export default function SettingsPage() {
   const [showClearCache, setShowClearCache] = useState(false);
   const [showReset, setShowReset] = useState(false);
   const [dangerBusy, setDangerBusy] = useState(false);
-
-  const BASE = API_BASE;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -53,10 +51,7 @@ export default function SettingsPage() {
   const clearCache = async () => {
     setDangerBusy(true);
     try {
-      const res = await fetch(`${BASE}/api/admin/cache`, {
-        method: 'POST',
-        credentials: 'include',
-      });
+      const res = await apiRequest('/api/admin/cache', { method: 'POST' });
       const payload = await res.json().catch(() => ({} as { error?: string }));
       if (!res.ok) throw new Error(payload.error ?? 'Failed to clear cache');
       setShowClearCache(false);

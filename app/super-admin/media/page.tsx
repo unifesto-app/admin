@@ -5,7 +5,7 @@ import BrandButton from '../components/BrandButton';
 import { BrandInput, BrandSelect } from '../components/BrandInput';
 import Modal from '../components/Modal';
 import { useToast } from '../components/ToastProvider';
-import { API_BASE } from '@/lib/api';
+import { apiRequest } from '@/lib/api';
 
 interface MediaRow {
   id: string;
@@ -22,8 +22,6 @@ interface MediaResponse {
   error?: string;
   meta?: { page: number; limit: number; total: number };
 }
-
-const BASE = API_BASE;
 
 export default function MediaLibraryPage() {
   const { showToast } = useToast();
@@ -47,9 +45,7 @@ export default function MediaLibraryPage() {
       const params = new URLSearchParams({ page: String(page), limit: String(limit) });
       if (search) params.set('search', search);
       if (type) params.set('type', type);
-      const res = await fetch(`${BASE}/api/media?${params.toString()}`, {
-        credentials: 'include',
-      });
+      const res = await apiRequest(`/api/media?${params.toString()}`);
       const data = await res.json() as MediaResponse;
       if (!res.ok || !data.success) throw new Error(data.error ?? 'Failed to load media');
       setRows(data.data ?? []);
@@ -71,10 +67,9 @@ export default function MediaLibraryPage() {
     try {
       const formData = new FormData();
       formData.append('file', file);
-      const res = await fetch(`${BASE}/api/media`, {
+      const res = await apiRequest('/api/media', {
         method: 'POST',
         body: formData,
-        credentials: 'include',
       });
       const data = await res.json() as { success: boolean; error?: string };
       if (!res.ok || !data.success) throw new Error(data.error ?? 'Failed to upload file');
@@ -89,9 +84,8 @@ export default function MediaLibraryPage() {
 
   const deleteFile = async (id: string) => {
     try {
-      const res = await fetch(`${BASE}/api/media?id=${id}`, {
+      const res = await apiRequest(`/api/media?id=${id}`, {
         method: 'DELETE',
-        credentials: 'include',
       });
       if (!res.ok && res.status !== 204) {
         const data = await res.json().catch(() => ({ error: 'Failed to delete file' }));

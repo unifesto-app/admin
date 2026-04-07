@@ -1,3 +1,5 @@
+import { createClient } from '@/utils/supabase/client';
+
 const LOCAL_API_BASE = 'http://localhost:4000';
 const PROD_API_BASE = 'https://api.unifesto.app';
 
@@ -30,41 +32,85 @@ function getBaseCandidates() {
 
 export const API_BASE = getBaseCandidates()[0] ?? LOCAL_API_BASE;
 
-export async function apiFetch<T = unknown>(path: string, options?: RequestInit): Promise<T> {
+const getAccessToken = async () => {
+  if (typeof window === 'undefined') return null;
+
+  const supabase = createClient();
+  const { data, error } = await supabase.auth.getSession();
+  if (error) return null;
+  return data.session?.access_token ?? null;
+};
+
+const handleAuthError = (status: number) => {
+  if (typeof window === 'undefined') return;
+  if (status === 401 && window.location.pathname !== '/login') {
+    window.location.href = '/login';
+  }
+};
+
+export async function apiRequest(path: string, options?: RequestInit): Promise<Response> {
   const candidates = getBaseCandidates();
-  let lastError = `Cannot reach API at ${API_BASE}. Make sure backend API is running.`;
+  const token = await getAccessToken();
+  let lastResponse: Response | null = null;
+
+  if (typeof window !== 'undefined' && !token) {
+    handleAuthError(401);
+    throw new Error('Unauthorized');
+  }
 
   for (const base of candidates) {
-    try {
-      const headers = new Headers(options?.headers);
-      const method = (options?.method ?? 'GET').toUpperCase();
-      if ((options?.body ?? null) !== null && method !== 'GET' && !headers.has('Content-Type')) {
-        headers.set('Content-Type', 'application/json');
-      }
+    const headers = new Headers(options?.headers);
+    const method = (options?.method ?? 'GET').toUpperCase();
 
+    if (token) {
+      headers.set('Authorization', `Bearer ${token}`);
+    }
+
+    if (
+      (options?.body ?? null) !== null &&
+      method !== 'GET' &&
+      !(options?.body instanceof FormData) &&
+      !headers.has('Content-Type')
+    ) {
+      headers.set('Content-Type', 'application/json');
+    }
+
+    try {
       const res = await fetch(`${base}${path}`, {
         ...options,
         headers,
         credentials: 'include',
       });
 
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: res.statusText }));
-        const message = err.error ?? 'API error';
-        if (res.status === 404 && base !== candidates[candidates.length - 1]) {
-          lastError = message;
-          continue;
-        }
-        throw new Error(message);
+      if (res.status === 404 && base !== candidates[candidates.length - 1]) {
+        lastResponse = res;
+        continue;
       }
 
-      return res.json();
-    } catch (error: unknown) {
-      lastError = error instanceof Error ? error.message : 'API error';
+      if (res.status === 401 || res.status === 403) {
+        handleAuthError(res.status);
+      }
+
+      return res;
+    } catch {
+      continue;
     }
   }
 
-  throw new Error(lastError);
+  if (lastResponse) return lastResponse;
+  throw new Error(`Cannot reach API at ${API_BASE}. Make sure backend API is running.`);
+}
+
+export async function apiFetch<T = unknown>(path: string, options?: RequestInit): Promise<T> {
+  const res = await apiRequest(path, options);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    if (res.status === 403) {
+      throw new Error('Permission denied');
+    }
+    throw new Error(err.error ?? 'API error');
+  }
+  return res.json();
 }
 
 export interface ApiResponse<T = unknown> {

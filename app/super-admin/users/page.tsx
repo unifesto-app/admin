@@ -24,6 +24,10 @@ export default function UsersPage() {
   const [newRole, setNewRole] = useState('attendee');
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [editUser, setEditUser] = useState<User | null>(null);
+  const [editFullName, setEditFullName] = useState('');
+  const [editRole, setEditRole] = useState('attendee');
+  const [editStatus, setEditStatus] = useState('active');
   const limit = 20;
 
   const load = useCallback(async () => {
@@ -77,6 +81,33 @@ export default function UsersPage() {
       showToast('User deleted', 'success');
     } catch {
       showToast('Failed to delete user', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const openEditModal = (user: User) => {
+    setEditUser(user);
+    setEditFullName(user.full_name || '');
+    setEditRole(user.role || 'attendee');
+    setEditStatus(user.status || 'active');
+  };
+
+  const handleEditUser = async () => {
+    if (!editUser) return;
+
+    setSaving(true);
+    try {
+      await usersApi.update(editUser.id, {
+        full_name: editFullName.trim(),
+        role: editRole,
+        status: editStatus,
+      });
+      setEditUser(null);
+      await load();
+      showToast('User updated successfully', 'success');
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : 'Failed to update user', 'error');
     } finally {
       setSaving(false);
     }
@@ -145,7 +176,10 @@ export default function UsersPage() {
                 </td>
                 <td className="px-5 py-3 text-zinc-400 text-xs">{u.created_at ? new Date(u.created_at).toLocaleDateString() : '—'}</td>
                 <td className="px-5 py-3">
-                  <button onClick={() => setDeleteId(u.id)} className="text-xs text-red-400 hover:text-red-600 transition-colors">Delete</button>
+                  <div className="flex items-center gap-3">
+                    <button onClick={() => openEditModal(u)} className="text-xs text-zinc-500 hover:text-zinc-700 transition-colors">Edit</button>
+                    <button onClick={() => setDeleteId(u.id)} className="text-xs text-red-400 hover:text-red-600 transition-colors">Delete</button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -189,6 +223,45 @@ export default function UsersPage() {
               <option value="super_admin">Admin</option>
               <option value="organizer">Organizer</option>
               <option value="attendee">Attendee</option>
+            </BrandSelect>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        open={Boolean(editUser)}
+        title="Edit User"
+        confirmLabel="Save Changes"
+        busy={saving}
+        onConfirm={handleEditUser}
+        onCancel={() => {
+          if (saving) return;
+          setEditUser(null);
+        }}
+      >
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs text-zinc-500 mb-1">Email</label>
+            <BrandInput type="email" value={editUser?.email ?? ''} disabled className="opacity-70" />
+          </div>
+          <div>
+            <label className="block text-xs text-zinc-500 mb-1">Full Name</label>
+            <BrandInput type="text" value={editFullName} onChange={(e) => setEditFullName(e.target.value)} placeholder="Jane Doe" />
+          </div>
+          <div>
+            <label className="block text-xs text-zinc-500 mb-1">Role</label>
+            <BrandSelect value={editRole} onChange={(e) => setEditRole(e.target.value)}>
+              <option value="super_admin">Admin</option>
+              <option value="organizer">Organizer</option>
+              <option value="attendee">Attendee</option>
+            </BrandSelect>
+          </div>
+          <div>
+            <label className="block text-xs text-zinc-500 mb-1">Status</label>
+            <BrandSelect value={editStatus} onChange={(e) => setEditStatus(e.target.value)}>
+              <option value="active">Active</option>
+              <option value="pending">Pending</option>
+              <option value="suspended">Suspended</option>
             </BrandSelect>
           </div>
         </div>

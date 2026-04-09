@@ -61,19 +61,34 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   let role: string | null = null;
+  let profileStatus: string | null = null;
   if (user) {
-    const { data: profile } = await supabase
+    const { data: profileById } = await supabase
       .from('profiles')
-      .select('role')
+      .select('role,status')
       .eq('id', user.id)
       .maybeSingle();
-    role = profile?.role ?? null;
+
+    role = profileById?.role ?? null;
+    profileStatus = profileById?.status ?? null;
+
+    if (!role && user.email) {
+      const { data: profileByEmail } = await supabase
+        .from('profiles')
+        .select('role,status')
+        .ilike('email', user.email)
+        .maybeSingle();
+
+      role = profileByEmail?.role ?? null;
+      profileStatus = profileByEmail?.status ?? profileStatus;
+    }
   }
 
   const isAuthenticated = Boolean(user);
   const privilegedEmails = getPrivilegedEmails();
   const isPrivilegedEmail = Boolean(user?.email && privilegedEmails.has(user.email.toLowerCase()));
-  const isAuthorizedAdmin = isAdminRole(role) || isPrivilegedEmail;
+  const isActiveProfile = !profileStatus || profileStatus === 'active';
+  const isAuthorizedAdmin = (isAdminRole(role) && isActiveProfile) || isPrivilegedEmail;
 
   if (pathname.startsWith('/super-admin')) {
     if (!isAuthenticated) {

@@ -46,7 +46,8 @@ export default function LoginClient({ nextPath, configError }: Props) {
     setError('');
 
     try {
-      const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}&popup=1`;
+      // Keep redirectTo fixed so it reliably matches Supabase allow-list rules.
+      const redirectTo = `${window.location.origin}/auth/callback`;
       const { data, error: signInError } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {

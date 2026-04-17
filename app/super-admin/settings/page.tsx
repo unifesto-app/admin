@@ -40,7 +40,7 @@ export default function SettingsPage() {
   const save = async (section: string, data: Partial<Settings>) => {
     setSaving(section); setError(''); setSuccess('');
     try {
-      await adminApi.update('settings', data);
+      await adminApi.patch('settings', data);
       setSuccess(`${section} settings saved.`);
       showToast(`${section} settings saved`, 'success');
       setTimeout(() => setSuccess(''), 3000);
@@ -79,7 +79,7 @@ export default function SettingsPage() {
         smtp_port: 587,
         smtp_user: '',
       };
-      await adminApi.update('settings', defaults as Record<string, unknown>);
+      await adminApi.patch('settings', defaults as Record<string, unknown>);
       setSettings(defaults);
       setShowReset(false);
       showToast('Settings reset to defaults', 'success');

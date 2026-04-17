@@ -172,13 +172,13 @@ export const financeApi = {
 
 export const adminApi = {
   get: (resource: string, p?: Record<string, string>) =>
-    apiFetch<ApiResponse>(`/api/admin?${new URLSearchParams({ resource, ...p })}`),
-  create: (resource: string, b: Record<string, unknown>) =>
-    apiFetch<ApiResponse>(`/api/admin?resource=${resource}`, { method: 'POST', body: JSON.stringify(b) }),
-  update: (resource: string, b: Record<string, unknown>, id?: string) =>
-    apiFetch<ApiResponse>(`/api/admin?resource=${resource}${id ? `&id=${id}` : ''}`, { method: 'PATCH', body: JSON.stringify(b) }),
-  delete: (resource: string, id: string) =>
-    apiFetch<ApiResponse>(`/api/admin?resource=${resource}&id=${id}`, { method: 'DELETE' }),
+    apiFetch<ApiResponse>(`/api/${resource}${p ? '?' + new URLSearchParams(p) : ''}`),
+  post: (resource: string, b: Record<string, unknown>) =>
+    apiFetch<ApiResponse>(`/api/${resource}`, { method: 'POST', body: JSON.stringify(b) }),
+  patch: (resource: string, b: Record<string, unknown>) =>
+    apiFetch<ApiResponse>(`/api/${resource}`, { method: 'PATCH', body: JSON.stringify(b) }),
+  delete: (resource: string) =>
+    apiFetch<ApiResponse>(`/api/${resource}`, { method: 'DELETE' }),
 };
 
 export const trackersApi = {

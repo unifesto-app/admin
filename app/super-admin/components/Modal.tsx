@@ -33,20 +33,24 @@ export default function Modal({
       <button
         type="button"
         aria-label="Close modal"
-        className="absolute inset-0 bg-black/35"
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
         onClick={onCancel}
       />
-      <div className="relative z-10 w-full max-w-lg rounded-xl border border-zinc-200 bg-white p-5 shadow-2xl">
+      <div className="relative z-10 w-full max-w-lg rounded-xl border border-zinc-200 bg-white p-6 shadow-2xl animate-fade-in-up">
         <h2 className="text-base font-semibold text-black">{title}</h2>
-        {children && <div className="mt-3">{children}</div>}
-        <div className="mt-5 flex items-center justify-end gap-2">
+        {children && <div className="mt-4">{children}</div>}
+        <div className="mt-6 flex items-center justify-end gap-3">
           <BrandButton variant="outline" onClick={onCancel} disabled={busy}>{cancelLabel}</BrandButton>
           {onConfirm && (
             <button
               type="button"
               onClick={onConfirm}
               disabled={busy}
-              className={`px-4 py-2 text-sm rounded-lg font-medium transition-colors disabled:opacity-50 ${danger ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-[#0062ff] text-white hover:bg-[#0051d4]'}`}
+              className={`brand-btn px-5 py-2.5 text-sm rounded-xl font-semibold transition-all disabled:opacity-50 ${
+                danger 
+                  ? 'bg-red-600 text-white hover:bg-red-700 shadow-lg hover:shadow-red-500/30' 
+                  : 'brand-btn-solid'
+              }`}
             >
               {busy ? 'Please wait...' : confirmLabel}
             </button>

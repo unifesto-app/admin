@@ -110,19 +110,37 @@ export default function LoginClient({ nextPath, configError }: Props) {
   };
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,_#ffffff_0%,_#f4f4f5_45%,_#e4e4e7_100%)] flex items-center justify-center p-6">
-      <div className="w-full max-w-sm bg-white border border-zinc-200 rounded-2xl p-6 shadow-[0_10px_40px_rgba(0,0,0,0.06)]">
+    <main className="min-h-screen bg-[#fafafa] flex items-center justify-center p-6">
+      <div className="w-full max-w-sm bg-white border border-zinc-200 rounded-2xl p-8 shadow-[0_10px_40px_rgba(0,0,0,0.08)] relative overflow-hidden">
+        {/* Gradient accent */}
+        <div 
+          className="absolute top-0 left-0 right-0 h-1" 
+          style={{ background: 'linear-gradient(135deg, #3491ff, #0062ff)' }}
+        />
+        
         <div className="mb-6">
-          <p className="text-xs uppercase tracking-[0.24em] text-zinc-400 mb-2">UNIFESTO</p>
+          <p 
+            className="gradient-text"
+            style={{
+              fontFamily: 'var(--font-sweet-apricot)',
+              fontSize: '1.75rem',
+              lineHeight: 1,
+              marginBottom: '0.5rem',
+              paddingLeft: '3px',
+              fontWeight: 'normal',
+            }}
+          >
+            unifesto
+          </p>
           <h1 className="text-2xl font-semibold text-black">Admin Login</h1>
           <p className="text-sm text-zinc-500 mt-2">Sign in with Google or email/password to access the console.</p>
         </div>
 
         {configError === 'supabase-config-missing' ? (
-          <p className="text-xs text-red-600 mb-4">Supabase environment variables are missing.</p>
+          <p className="text-xs text-red-600 mb-4 bg-red-50 border border-red-200 rounded-lg px-3 py-2">Supabase environment variables are missing.</p>
         ) : null}
 
-        {error ? <p className="text-xs text-red-600 mb-4">{error}</p> : null}
+        {error ? <p className="text-xs text-red-600 mb-4 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p> : null}
 
         <div className="space-y-3 mb-4">
           <input
@@ -131,7 +149,7 @@ export default function LoginClient({ nextPath, configError }: Props) {
             onChange={(e) => setEmail(e.target.value)}
             placeholder="Email"
             autoComplete="email"
-            className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500"
+            className="brand-input"
           />
           <input
             type="password"
@@ -139,13 +157,13 @@ export default function LoginClient({ nextPath, configError }: Props) {
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Password"
             autoComplete="current-password"
-            className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500"
+            className="brand-input"
           />
           <button
             type="button"
             onClick={handleEmailPasswordSignIn}
             disabled={loading}
-            className="w-full bg-zinc-900 text-white text-sm rounded-lg py-2.5 font-medium hover:bg-black disabled:opacity-60"
+            className="brand-btn brand-btn-solid w-full"
           >
             {loading ? 'Signing in...' : 'Sign in with Email'}
           </button>
@@ -161,13 +179,13 @@ export default function LoginClient({ nextPath, configError }: Props) {
           type="button"
           onClick={handleGoogleSignIn}
           disabled={loading}
-          className="w-full border border-zinc-200 bg-white text-zinc-700 text-sm rounded-lg py-2.5 font-medium hover:bg-zinc-50 disabled:opacity-60 inline-flex items-center justify-center gap-2 transition-colors"
+          className="brand-btn brand-btn-ghost w-full inline-flex items-center justify-center gap-2"
         >
           <GoogleLogo />
           {loading ? 'Opening Google...' : 'Continue with Google'}
         </button>
 
-        <p className="text-xs text-zinc-400 mt-3">Only users with admin privileges can access the dashboard.</p>
+        <p className="text-xs text-zinc-400 mt-4 text-center">Only users with admin privileges can access the dashboard.</p>
       </div>
     </main>
   );

@@ -157,23 +157,23 @@ export default function SuperAdminDashboard() {
       <div className="grid grid-cols-2 xl:grid-cols-3 gap-4">
         {loading
           ? Array.from({ length: 6 }).map((_, i) => (
-            <div key={`loading-metric-${i}`} className="bg-white border border-zinc-200 rounded-xl p-5">
+            <div key={`loading-metric-${i}`} className="brand-card">
               <div className="h-3 w-24 bg-zinc-100 rounded animate-pulse mb-2" />
               <div className="h-7 w-20 bg-zinc-100 rounded animate-pulse mb-1" />
               <div className="h-3 w-28 bg-zinc-50 rounded animate-pulse" />
             </div>
           ))
           : renderedMetrics.map((metric) => (
-            <div key={metric.label} className="bg-white border border-zinc-200 rounded-xl p-5">
+            <div key={metric.label} className="stat-card">
               <p className="text-xs text-zinc-400 uppercase tracking-wide mb-2">{metric.label}</p>
-              <p className="text-2xl font-bold text-black mb-1">{metric.value}</p>
+              <p className="text-2xl font-bold gradient-text mb-1">{metric.value}</p>
               <p className="text-xs text-zinc-400">{metric.helper}</p>
             </div>
           ))}
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        <div className="xl:col-span-2 bg-white border border-zinc-200 rounded-xl p-5">
+        <div className="xl:col-span-2 brand-card">
           <h2 className="text-sm font-semibold text-black mb-4">Recent Security Activity</h2>
           {loading ? (
             <div className="space-y-3">
@@ -184,7 +184,7 @@ export default function SuperAdminDashboard() {
           ) : snapshot && snapshot.recentActivity.length > 0 ? (
             <div className="space-y-2">
               {snapshot.recentActivity.map((item) => (
-                <div key={item.id} className="border border-zinc-100 rounded-lg px-3 py-2.5 flex items-center justify-between">
+                <div key={item.id} className="border border-zinc-100 rounded-lg px-3 py-2.5 flex items-center justify-between hover:border-zinc-200 transition-colors">
                   <p className="text-sm text-zinc-700 font-medium">{item.label}</p>
                   <p className="text-xs text-zinc-400">{new Date(item.at).toLocaleString()}</p>
                 </div>
@@ -192,14 +192,14 @@ export default function SuperAdminDashboard() {
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-12 text-center">
-              <div className="w-10 h-10 rounded-full bg-zinc-100 flex items-center justify-center mb-3 text-lg" style={{ color: '#0062ff' }}>◷</div>
+              <div className="w-10 h-10 rounded-full bg-zinc-100 flex items-center justify-center mb-3 text-lg gradient-text">◷</div>
               <p className="text-sm text-zinc-500 font-medium">No activity yet</p>
               <p className="text-xs text-zinc-400 mt-1">Recent audit log actions will appear here automatically.</p>
             </div>
           )}
         </div>
 
-        <div className="bg-white border border-zinc-200 rounded-xl p-5">
+        <div className="brand-card">
           <h2 className="text-sm font-semibold text-black mb-4">Security Posture</h2>
           <div className="space-y-2.5 mb-5">
             {(snapshot?.security ?? []).map((signal) => (
@@ -216,7 +216,7 @@ export default function SuperAdminDashboard() {
               <Link
                 key={a.label}
                 href={a.href}
-                className="flex items-center justify-between px-3 py-2.5 rounded-lg border border-zinc-100 hover:border-zinc-300 hover:bg-zinc-50 transition-all text-sm text-zinc-700"
+                className="flex items-center justify-between px-3 py-2.5 rounded-lg border border-zinc-100 hover:border-blue-200 hover:bg-blue-50 transition-all text-sm text-zinc-700 hover:text-blue-700"
               >
                 {a.label}<span className="text-zinc-300">→</span>
               </Link>

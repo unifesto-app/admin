@@ -40,7 +40,7 @@ export default function ApiKeysPage() {
         : expiry === '90d' ? new Date(Date.now() + 90 * 86400000).toISOString()
         : new Date(Date.now() + 365 * 86400000).toISOString();
 
-      const res = await adminApi.create('api-keys', { name, permissions, expires_at: expiresAt }) as ApiResponse<ApiKey & { key: string }>;
+      const res = await adminApi.post('api-keys', { name, permissions, expires_at: expiresAt }) as ApiResponse<ApiKey & { key: string }>;
       if (res.data?.key) setNewKey(res.data.key);
       setName(''); setPermissions('read'); setExpiry('never');
       load();
@@ -51,7 +51,7 @@ export default function ApiKeysPage() {
 
   const handleDelete = async (id: string) => {
     try {
-      await adminApi.delete('api-keys', id);
+      await adminApi.delete(`api-keys/${id}`);
       setDeleteId(null);
       load();
       showToast('API key revoked', 'success');

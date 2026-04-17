@@ -41,7 +41,7 @@ export default function AnnouncementsPage() {
     if (!title || !message || !audience) { showToast('Title, message and audience are required', 'error'); return; }
     setSaving(true);
     try {
-      await adminApi.create('announcements', { title, message, audience, severity });
+      await adminApi.post('announcements', { title, message, audience, severity });
       setTitle(''); setMessage(''); setAudience(''); setSeverity('info');
       load();
       showToast('Announcement published', 'success');
@@ -51,7 +51,7 @@ export default function AnnouncementsPage() {
 
   const handleDelete = async (id: string) => {
     try {
-      await adminApi.delete('announcements', id);
+      await adminApi.delete(`announcements/${id}`);
       setDeleteId(null);
       load();
       showToast('Announcement deleted', 'success');

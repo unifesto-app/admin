@@ -40,7 +40,7 @@ export default function CategoriesPage() {
     if (!name || !slug) { showToast('Name and slug are required', 'error'); return; }
     setSaving(true);
     try {
-      await adminApi.create('categories', { name, slug, description: desc });
+      await adminApi.post('categories', { name, slug, description: desc });
       setName(''); setSlug(''); setDesc(''); load();
       showToast('Category created', 'success');
     } catch { showToast('Failed to create category', 'error'); }
@@ -49,7 +49,7 @@ export default function CategoriesPage() {
 
   const handleDelete = async (id: string) => {
     try {
-      await adminApi.delete('categories', id);
+      await adminApi.delete(`categories/${id}`);
       setDeleteId(null);
       load();
       showToast('Category deleted', 'success');

@@ -143,7 +143,7 @@ export default function EventsPage() {
               <tr>
                 <td colSpan={5} className="px-5 py-16 text-center">
                   <div className="flex flex-col items-center gap-2">
-                    <div className="w-10 h-10 rounded-full bg-zinc-100 flex items-center justify-center text-lg" style={{ color: '#0062ff' }}>◷</div>
+                    <div className="w-10 h-10 rounded-full bg-zinc-100 flex items-center justify-center text-lg gradient-text">◷</div>
                     <p className="text-sm font-medium text-zinc-500">No events yet</p>
                     <p className="text-xs text-zinc-400">Create your first event or wait for organizers to submit one.</p>
                   </div>

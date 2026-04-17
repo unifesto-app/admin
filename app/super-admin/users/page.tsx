@@ -158,7 +158,7 @@ export default function UsersPage() {
               <tr>
                 <td colSpan={6} className="px-5 py-16 text-center">
                   <div className="flex flex-col items-center gap-2">
-                    <div className="w-10 h-10 rounded-full bg-zinc-100 flex items-center justify-center text-lg" style={{ color: '#0062ff' }}>◉</div>
+                    <div className="w-10 h-10 rounded-full bg-zinc-100 flex items-center justify-center text-lg gradient-text">◉</div>
                     <p className="text-sm font-medium text-zinc-500">No users found</p>
                     <p className="text-xs text-zinc-400">Users will appear here once they register or are added manually.</p>
                   </div>

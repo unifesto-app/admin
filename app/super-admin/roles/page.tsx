@@ -60,7 +60,7 @@ export default function RolesPage() {
     }
     setSaving(true);
     try {
-      await adminApi.create('roles', {
+      await adminApi.post('roles', {
         name: name.trim(),
         description: description.trim(),
         permissions: parsePermissions(),
@@ -85,11 +85,11 @@ export default function RolesPage() {
 
     setSaving(true);
     try {
-      await adminApi.update('roles', {
+      await adminApi.patch(`roles/${editing.id}`, {
         name: name.trim(),
         description: description.trim(),
         permissions: parsePermissions(),
-      }, editing.id);
+      });
       setEditing(null);
       resetForm();
       await load();
@@ -105,7 +105,7 @@ export default function RolesPage() {
     if (!deleteTarget) return;
     setSaving(true);
     try {
-      await adminApi.delete('roles', deleteTarget.id);
+      await adminApi.delete(`roles/${deleteTarget.id}`);
       setDeleteTarget(null);
       await load();
       showToast('Role deleted', 'success');

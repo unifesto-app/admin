@@ -7,19 +7,54 @@ import { ToastProvider } from './components/ToastProvider';
 export default function AdminLayout({ children }: { children: ReactNode }) {
   return (
     <ToastProvider>
-      <div className="flex h-screen bg-zinc-100 overflow-hidden">
+      <div className="flex h-screen bg-[#fafafa] overflow-hidden">
         <PageViewTracker />
         <Sidebar />
         <div className="flex flex-col flex-1 overflow-hidden">
-          <header className="h-14 bg-white border-b border-zinc-200 flex items-center justify-between px-6 shrink-0">
-            <p className="text-sm text-zinc-400">UNIFESTO Admin</p>
+          {/* Header with gradient accent */}
+          <header className="h-16 bg-white border-b border-zinc-200 flex items-center justify-between px-8 shrink-0 relative">
+            {/* Gradient top border */}
+            <div 
+              className="absolute top-0 left-0 right-0 h-1" 
+              style={{ background: 'linear-gradient(135deg, #3491ff, #0062ff)' }}
+            />
+            
             <div className="flex items-center gap-3">
+              <h1 
+                className="gradient-text"
+                style={{
+                  fontFamily: 'var(--font-sweet-apricot)',
+                  fontSize: '2rem',
+                  lineHeight: 1,
+                  paddingLeft: '3px',
+                  fontWeight: 'normal',
+                }}
+              >
+                unifesto
+              </h1>
+              <span className="text-xs text-zinc-400 font-medium uppercase tracking-wider">Admin</span>
+            </div>
+            
+            <div className="flex items-center gap-4">
               <LogoutButton />
-              <span className="text-xs bg-zinc-100 text-zinc-600 px-2 py-1 rounded-full">Super Admin</span>
-              <div className="w-8 h-8 rounded-full text-white flex items-center justify-center text-xs font-semibold" style={{ backgroundColor: '#0062ff' }}>SA</div>
+              <div className="flex items-center gap-3">
+                <div className="text-right">
+                  <p className="text-sm font-semibold text-zinc-900">Super Admin</p>
+                  <p className="text-xs text-zinc-500">Full Access</p>
+                </div>
+                <div 
+                  className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white shadow-lg"
+                  style={{ background: 'linear-gradient(135deg, #3491ff, #0062ff)' }}
+                >
+                  SA
+                </div>
+              </div>
             </div>
           </header>
-          <main className="flex-1 overflow-y-auto p-6">{children}</main>
+          
+          <main className="flex-1 overflow-y-auto p-8 bg-[#fafafa]">
+            {children}
+          </main>
         </div>
       </div>
     </ToastProvider>

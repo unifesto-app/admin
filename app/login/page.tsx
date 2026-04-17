@@ -9,9 +9,16 @@ const first = (value: string | string[] | undefined) => {
   return value ?? '';
 };
 
+const sanitizeNextPath = (rawPath: string) => {
+  if (!rawPath.startsWith('/')) return '/super-admin';
+  if (!rawPath.startsWith('/super-admin')) return '/super-admin';
+  if (rawPath.startsWith('//')) return '/super-admin';
+  return rawPath;
+};
+
 export default async function LoginPage({ searchParams }: Props) {
   const params = await searchParams;
-  const nextPath = first(params.next) || '/super-admin';
+  const nextPath = sanitizeNextPath(first(params.next) || '/super-admin');
   const configError = first(params.error);
 
   return <LoginClient nextPath={nextPath} configError={configError} />;

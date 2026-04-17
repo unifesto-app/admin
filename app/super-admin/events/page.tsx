@@ -4,9 +4,10 @@ import BrandButton from '../components/BrandButton';
 import { BrandInput, BrandSelect } from '../components/BrandInput';
 import Modal from '../components/Modal';
 import { useToast } from '../components/ToastProvider';
-import { eventsApi, ApiResponse } from '@/lib/api';
+import { eventsApi, adminApi, ApiResponse } from '@/lib/api';
 
 interface Event { id: string; title: string; status: string; category: string; start_date: string; created_by: string; }
+interface Category { id: string; name: string; slug: string; }
 
 const statusColors: Record<string, string> = {
   draft: 'bg-zinc-100 text-zinc-500',
@@ -27,6 +28,7 @@ export default function EventsPage() {
   const [status, setStatus] = useState('');
   const [category, setCategory] = useState('');
   const [newCategory, setNewCategory] = useState('');
+  const [categories, setCategories] = useState<Category[]>([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newDate, setNewDate] = useState(new Date().toISOString().slice(0, 10));
@@ -49,6 +51,18 @@ export default function EventsPage() {
   }, [page, search, status, category]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    adminApi
+      .get('categories')
+      .then((res) => {
+        const payload = res as ApiResponse<Category[]>;
+        setCategories(payload.data ?? []);
+      })
+      .catch(() => {
+        setCategories([]);
+      });
+  }, []);
 
   const handleCreateEvent = async () => {
     if (!newTitle.trim()) {
@@ -105,10 +119,9 @@ export default function EventsPage() {
         </BrandSelect>
         <BrandSelect value={category} onChange={(e) => { setCategory(e.target.value); setPage(1); }}>
           <option value="">All Categories</option>
-          <option value="conference">Conference</option>
-          <option value="workshop">Workshop</option>
-          <option value="seminar">Seminar</option>
-          <option value="networking">Networking</option>
+          {categories.map((c) => (
+            <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
         </BrandSelect>
       </div>
 
@@ -192,10 +205,9 @@ export default function EventsPage() {
             <label className="block text-xs text-zinc-500 mb-1">Category</label>
             <BrandSelect value={newCategory} onChange={(e) => setNewCategory(e.target.value)}>
               <option value="">No category</option>
-              <option value="conference">Conference</option>
-              <option value="workshop">Workshop</option>
-              <option value="seminar">Seminar</option>
-              <option value="networking">Networking</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
             </BrandSelect>
           </div>
         </div>

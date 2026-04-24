@@ -4,6 +4,10 @@ import PageViewTracker from './components/PageViewTracker';
 import LogoutButton from './components/LogoutButton';
 import { ToastProvider } from './components/ToastProvider';
 
+// Force dynamic rendering - admin pages require runtime authentication
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export default function AdminLayout({ children }: { children: ReactNode }) {
   return (
     <ToastProvider>

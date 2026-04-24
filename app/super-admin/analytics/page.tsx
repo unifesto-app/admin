@@ -4,6 +4,9 @@ import { usersApi, eventsApi, financeApi, ApiResponse } from '@/lib/api';
 
 interface KPI { label: string; value: string | number; sub: string; }
 
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+
 export default function AnalyticsPage() {
   const [kpis, setKpis] = useState<KPI[]>([]);
   const [loading, setLoading] = useState(true);

@@ -3,6 +3,9 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { API_BASE, adminApi, eventsApi, financeApi, orgsApi, trackersApi, usersApi, type ApiResponse } from '@/lib/api';
 
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+
 const actions = [
   { label: 'Create New Event', href: '/super-admin/events' },
   { label: 'Add User', href: '/super-admin/users' },

@@ -105,6 +105,7 @@ export async function middleware(request: NextRequest) {
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+  // Rate limiting for auth routes
   if (pathname === '/login' || pathname === '/auth/callback') {
     const clientIp = getClientIp(request);
     const limited = isRateLimited(`${pathname}:${clientIp}`);
@@ -118,8 +119,9 @@ export async function middleware(request: NextRequest) {
     }
   }
 
+  // Check Supabase configuration
   if (!supabaseUrl || !supabaseKey) {
-    if (pathname.startsWith('/super-admin')) {
+    if (pathname.startsWith('/dashboard')) {
       const loginUrl = new URL('/login', request.url);
       loginUrl.searchParams.set('next', `${pathname}${search}`);
       loginUrl.searchParams.set('error', 'supabase-config-missing');
@@ -156,10 +158,12 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   let role: string | null = null;
-  let profileStatus: string | null = null;
+  let isActive: boolean = true;
+  let isBanned: boolean = false;
+  
   if (user) {
-    let profileById: { role?: string; status?: string } | null = null;
-    let profileByEmail: { role?: string; status?: string } | null = null;
+    let profileById: { role?: string; is_active?: boolean; is_banned?: boolean } | null = null;
+    let profileByEmail: { role?: string; is_active?: boolean; is_banned?: boolean } | null = null;
 
     if (serviceRoleKey) {
       const adminClient = createSupabaseClient(supabaseUrl, serviceRoleKey, {
@@ -172,7 +176,7 @@ export async function middleware(request: NextRequest) {
 
       const { data: byId } = await adminClient
         .from('profiles')
-        .select('role,status')
+        .select('role,is_active,is_banned')
         .eq('id', user.id)
         .maybeSingle();
 
@@ -181,7 +185,7 @@ export async function middleware(request: NextRequest) {
       if (!profileById?.role && user.email) {
         const { data: byEmail } = await adminClient
           .from('profiles')
-          .select('role,status')
+          .select('role,is_active,is_banned')
           .ilike('email', user.email)
           .maybeSingle();
 
@@ -190,7 +194,7 @@ export async function middleware(request: NextRequest) {
     } else {
       const { data: byId } = await supabase
         .from('profiles')
-        .select('role,status')
+        .select('role,is_active,is_banned')
         .eq('id', user.id)
         .maybeSingle();
 
@@ -199,7 +203,7 @@ export async function middleware(request: NextRequest) {
       if (!profileById?.role && user.email) {
         const { data: byEmail } = await supabase
           .from('profiles')
-          .select('role,status')
+          .select('role,is_active,is_banned')
           .ilike('email', user.email)
           .maybeSingle();
 
@@ -208,18 +212,21 @@ export async function middleware(request: NextRequest) {
     }
 
     role = profileById?.role ?? null;
-    profileStatus = profileById?.status ?? null;
+    isActive = profileById?.is_active ?? true;
+    isBanned = profileById?.is_banned ?? false;
     role = role ?? profileByEmail?.role ?? null;
-    profileStatus = profileStatus ?? profileByEmail?.status ?? null;
+    isActive = isActive ?? profileByEmail?.is_active ?? true;
+    isBanned = isBanned ?? profileByEmail?.is_banned ?? false;
   }
 
   const isAuthenticated = Boolean(user);
   const privilegedEmails = getPrivilegedEmails();
   const isPrivilegedEmail = Boolean(user?.email && privilegedEmails.has(user.email.toLowerCase()));
-  const isActiveProfile = !profileStatus || profileStatus === 'active';
+  const isActiveProfile = isActive && !isBanned;
   const isAuthorizedAdmin = (isAdminRole(role) && isActiveProfile) || isPrivilegedEmail;
 
-  if (pathname.startsWith('/super-admin')) {
+  // Protect dashboard routes
+  if (pathname.startsWith('/dashboard')) {
     if (!isAllowedIp(request)) {
       return withSecurityHeaders(NextResponse.redirect(new URL('/unauthorized?reason=ip-restricted', request.url)));
     }
@@ -235,13 +242,14 @@ export async function middleware(request: NextRequest) {
     }
   }
 
+  // Redirect authenticated admins away from login
   if (pathname === '/login' && isAuthenticated && isAuthorizedAdmin) {
-    return withSecurityHeaders(NextResponse.redirect(new URL('/super-admin', request.url)));
+    return withSecurityHeaders(NextResponse.redirect(new URL('/dashboard', request.url)));
   }
 
   return withSecurityHeaders(response);
 }
 
 export const config = {
-  matcher: ['/super-admin/:path*', '/login', '/auth/callback'],
+  matcher: ['/dashboard/:path*', '/login', '/auth/callback'],
 };

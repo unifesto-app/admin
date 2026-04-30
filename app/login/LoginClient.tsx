@@ -110,11 +110,15 @@ export default function LoginClient({ nextPath, configError }: Props) {
       }
 
       // Check if user has admin privileges
-      const { data: profile } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('role, status')
         .eq('id', data.user.id)
         .maybeSingle();
+
+      if (profileError) {
+        console.error('Profile fetch error:', profileError);
+      }
 
       const isAdmin = profile?.role === 'super_admin' || profile?.role === 'admin';
       const isActive = !profile?.status || profile.status === 'active';
@@ -129,7 +133,8 @@ export default function LoginClient({ nextPath, configError }: Props) {
       }
 
       // Success - redirect to admin panel
-      window.location.assign(nextPath);
+      router.push(nextPath);
+      router.refresh();
     } catch (e: unknown) {
       const errorMessage = e instanceof Error ? e.message : 'Email sign-in failed';
       setError(errorMessage);

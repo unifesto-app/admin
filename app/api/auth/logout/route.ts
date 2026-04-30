@@ -1,14 +1,25 @@
-import { getAuthCookieName } from '@/lib/admin-auth';
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
+import { createClient } from '@/utils/supabase/server';
 
+/**
+ * POST /api/auth/logout
+ * Handles logout via Supabase
+ */
 export async function POST() {
-  const response = NextResponse.json({ success: true });
-  response.cookies.set(getAuthCookieName(), '', {
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
-    path: '/',
-    expires: new Date(0),
-  });
-  return response;
+  try {
+    const cookieStore = await cookies();
+    const supabase = createClient(cookieStore);
+
+    // Sign out from Supabase
+    await supabase.auth.signOut();
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Logout error:', error);
+    return NextResponse.json(
+      { success: false, error: 'Logout failed' },
+      { status: 500 }
+    );
+  }
 }

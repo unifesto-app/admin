@@ -46,8 +46,10 @@ export default function LoginClient({ nextPath, configError }: Props) {
     setError('');
 
     try {
-      // Keep redirectTo fixed so it reliably matches Supabase allow-list rules.
+      // Use production URL for OAuth callback
+      // This must match the URL configured in Supabase Dashboard → Authentication → URL Configuration
       const redirectTo = `${window.location.origin}/auth/callback`;
+      
       const { data, error: signInError } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -78,7 +80,8 @@ export default function LoginClient({ nextPath, configError }: Props) {
         throw new Error('Popup blocked by browser. Please allow popups for this site.');
       }
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Google sign-in failed');
+      const errorMessage = e instanceof Error ? e.message : 'Google sign-in failed';
+      setError(errorMessage);
       setLoading(false);
     }
   };
@@ -93,7 +96,7 @@ export default function LoginClient({ nextPath, configError }: Props) {
     setError('');
 
     try {
-      const { error: signInError } = await supabase.auth.signInWithPassword({
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
@@ -102,9 +105,34 @@ export default function LoginClient({ nextPath, configError }: Props) {
         throw signInError;
       }
 
+      if (!data.user) {
+        throw new Error('Authentication failed');
+      }
+
+      // Check if user has admin privileges
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role, status')
+        .eq('id', data.user.id)
+        .maybeSingle();
+
+      const isAdmin = profile?.role === 'super_admin' || profile?.role === 'admin';
+      const isActive = !profile?.status || profile.status === 'active';
+
+      // Check privileged emails
+      const privilegedEmails = ['unifestoapp@gmail.com']; // Default privileged email
+      const isPrivileged = email && privilegedEmails.includes(email.toLowerCase());
+
+      if (!isPrivileged && (!isAdmin || !isActive)) {
+        await supabase.auth.signOut();
+        throw new Error('You do not have admin privileges. Please contact support.');
+      }
+
+      // Success - redirect to admin panel
       window.location.assign(nextPath);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Email sign-in failed');
+      const errorMessage = e instanceof Error ? e.message : 'Email sign-in failed';
+      setError(errorMessage);
       setLoading(false);
     }
   };

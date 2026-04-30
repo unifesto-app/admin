@@ -19,6 +19,9 @@ export async function GET(request: NextRequest) {
         : { type: 'oauth:success', next: safeNext }
     );
 
+    // Use the current request origin to ensure correct domain
+    const origin = requestUrl.origin;
+
     return new NextResponse(
       `<!doctype html>
 <html><head><title>Auth Complete</title></head>
@@ -27,17 +30,21 @@ export async function GET(request: NextRequest) {
   (function () {
     var payload = ${payload};
     var fallback = ${JSON.stringify(safeNext)};
+    var origin = ${JSON.stringify(origin)};
 
     if (window.opener && !window.opener.closed) {
-      window.opener.postMessage(payload, window.location.origin);
+      // Post message to opener window (main login window)
+      window.opener.postMessage(payload, origin);
       window.close();
       return;
     }
 
-    window.location.replace(fallback);
+    // If no opener (direct navigation), redirect to admin dashboard
+    window.location.replace(origin + fallback);
   })();
 </script>
-Authentication complete. You can close this window.
+<p>Authentication complete. Redirecting...</p>
+<p>If you are not redirected, <a href="${safeNext}">click here</a>.</p>
 </body></html>`,
       {
         headers: {

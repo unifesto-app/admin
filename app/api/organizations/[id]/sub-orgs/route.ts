@@ -1,0 +1,158 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@/lib/supabase/server';
+import { createClient as createServiceClient } from '@supabase/supabase-js';
+import { logSuccess, logFailure, getClientIp, getUserAgent } from '@/lib/audit/audit-logger';
+
+// GET /api/organizations/[id]/sub-orgs - Get sub-organizations
+export async function GET(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  try {
+    // Await params in Next.js 15
+    const params = await context.params;
+    const orgId = params.id;
+    
+    const supabase = await createClient();
+
+    // Check authentication
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      await logFailure('view_sub_organizations', 'organizations', 'Unauthorized access attempt', {
+        resourceId: orgId,
+        ipAddress: getClientIp(request.headers),
+        userAgent: getUserAgent(request.headers),
+      });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Check admin privileges
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    if (!profile || (profile.role !== 'admin' && profile.role !== 'super_admin')) {
+      await logFailure('view_sub_organizations', 'organizations', 'Forbidden - insufficient privileges', {
+        userId: user.id,
+        resourceId: orgId,
+        ipAddress: getClientIp(request.headers),
+        userAgent: getUserAgent(request.headers),
+      });
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    // Use service role client to bypass RLS
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+    const adminClient = createServiceClient(supabaseUrl, serviceRoleKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+    });
+
+    // Get query parameters
+    const searchParams = request.nextUrl.searchParams;
+    const recursive = searchParams.get('recursive') === 'true';
+
+    if (recursive) {
+      // Get all sub-organizations recursively using the database function
+      const { data: hierarchy, error } = await adminClient.rpc('get_organization_hierarchy', {
+        org_id: orgId,
+      });
+
+      if (error) {
+        console.error('Error fetching organization hierarchy:', error);
+        await logFailure('view_sub_organizations', 'organizations', error.message, {
+          userId: user.id,
+          resourceId: orgId,
+          ipAddress: getClientIp(request.headers),
+          userAgent: getUserAgent(request.headers),
+        });
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+
+      // Filter out the parent organization (level 0)
+      const subOrgs = (hierarchy || []).filter((org: any) => org.level > 0);
+
+      await logSuccess('view_sub_organizations', 'organizations', {
+        userId: user.id,
+        resourceId: orgId,
+        details: { count: subOrgs.length, recursive: true },
+        ipAddress: getClientIp(request.headers),
+        userAgent: getUserAgent(request.headers),
+      });
+
+      return NextResponse.json({
+        sub_organizations: subOrgs,
+        total: subOrgs.length,
+      });
+    } else {
+      // Get direct children only
+      const { data: subOrgs, error } = await adminClient
+        .from('organizations')
+        .select('*')
+        .eq('parent_org_id', orgId)
+        .order('name', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching sub-organizations:', error);
+        await logFailure('view_sub_organizations', 'organizations', error.message, {
+          userId: user.id,
+          resourceId: orgId,
+          ipAddress: getClientIp(request.headers),
+          userAgent: getUserAgent(request.headers),
+        });
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+
+      // Enrich with member and sub-org counts
+      const enrichedSubOrgs = await Promise.all(
+        (subOrgs || []).map(async (org) => {
+          // Get member count
+          const { count: memberCount } = await adminClient
+            .from('organization_members')
+            .select('*', { count: 'exact', head: true })
+            .eq('organization_id', org.id);
+
+          // Get sub-org count
+          const { count: subOrgCount } = await adminClient
+            .from('organizations')
+            .select('*', { count: 'exact', head: true })
+            .eq('parent_org_id', org.id);
+
+          return {
+            ...org,
+            member_count: memberCount || 0,
+            sub_org_count: subOrgCount || 0,
+          };
+        })
+      );
+
+      await logSuccess('view_sub_organizations', 'organizations', {
+        userId: user.id,
+        resourceId: orgId,
+        details: { count: subOrgs?.length || 0, recursive: false },
+        ipAddress: getClientIp(request.headers),
+        userAgent: getUserAgent(request.headers),
+      });
+
+      return NextResponse.json({
+        sub_organizations: enrichedSubOrgs,
+        total: enrichedSubOrgs.length,
+      });
+    }
+  } catch (error) {
+    console.error('Unexpected error:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}

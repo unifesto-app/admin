@@ -1,0 +1,368 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { brandGradient } from '@/lib/styles';
+import { 
+  Search, 
+  Filter, 
+  Plus, 
+  Building2, 
+  Users, 
+  ChevronRight,
+  Edit,
+  Trash2,
+  Eye,
+  Shield,
+  UserPlus
+} from 'lucide-react';
+import Link from 'next/link';
+
+interface Organization {
+  id: string;
+  name: string;
+  slug: string;
+  type: 'university' | 'college' | 'club' | 'community';
+  description: string | null;
+  parent_org_id: string | null;
+  logo_url: string | null;
+  website: string | null;
+  is_verified: boolean;
+  is_active: boolean;
+  created_at: string;
+  member_count?: number;
+  sub_org_count?: number;
+  parent_org?: {
+    id: string;
+    name: string;
+    type: string;
+  } | null;
+}
+
+const ORG_TYPE_LABELS = {
+  university: 'University',
+  college: 'College',
+  club: 'Club',
+  community: 'Community',
+};
+
+const ORG_TYPE_COLORS = {
+  university: 'bg-blue-100 text-blue-800 border-blue-300',
+  college: 'bg-blue-50 text-blue-700 border-blue-200',
+  club: 'bg-cyan-100 text-cyan-800 border-cyan-300',
+  community: 'bg-sky-100 text-sky-800 border-sky-300',
+};
+
+export default function OrganizationsPage() {
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+
+  // Filters
+  const [search, setSearch] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+
+  const fetchOrganizations = async () => {
+    try {
+      setLoading(true);
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: '20',
+        parent_org_id: 'null', // Only fetch top-level organizations
+      });
+
+      if (search) params.append('search', search);
+      if (typeFilter) params.append('type', typeFilter);
+      if (statusFilter) params.append('status', statusFilter);
+
+      const response = await fetch(`/api/organizations?${params}`);
+      
+      if (!response.ok) {
+        const data = await response.json();
+        console.error('Error fetching organizations:', data.error);
+        // Set empty state on error
+        setOrganizations([]);
+        setTotal(0);
+        setTotalPages(1);
+        return;
+      }
+
+      const data = await response.json();
+      setOrganizations(data.organizations);
+      setTotal(data.pagination.total);
+      setTotalPages(data.pagination.totalPages);
+    } catch (error) {
+      console.error('Error fetching organizations:', error);
+      // Set empty state on error
+      setOrganizations([]);
+      setTotal(0);
+      setTotalPages(1);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchOrganizations();
+  }, [page]);
+
+  const handleSearch = () => {
+    setPage(1);
+    fetchOrganizations();
+  };
+
+  const getTypeBadge = (type: string) => {
+    return (
+      <span
+        className={`px-2 py-1 text-xs font-medium rounded-full border ${
+          ORG_TYPE_COLORS[type as keyof typeof ORG_TYPE_COLORS] || 'bg-gray-100 text-gray-800 border-gray-300'
+        }`}
+      >
+        {ORG_TYPE_LABELS[type as keyof typeof ORG_TYPE_LABELS] || type}
+      </span>
+    );
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Organizations</h1>
+          <p className="text-gray-600 mt-1">
+            Manage universities, colleges, clubs, and communities ({total.toLocaleString()} total)
+          </p>
+        </div>
+        <Link href="/dashboard/organizations/new">
+          <Button className="rounded-full">
+            <Plus className="w-4 h-4 mr-2" />
+            Add Organization
+          </Button>
+        </Link>
+      </div>
+
+      {/* Search and Filters */}
+      <Card className="p-4">
+        <div className="space-y-4">
+          <div className="flex gap-2">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <input
+                type="text"
+                placeholder="Search organizations..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <Button onClick={handleSearch} className="rounded-full">
+              Search
+            </Button>
+            <Button
+              onClick={() => setShowFilters(!showFilters)}
+              variant="outline"
+              className="rounded-full"
+            >
+              <Filter className="w-4 h-4 mr-2" />
+              Filters
+            </Button>
+          </div>
+
+          {showFilters && (
+            <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Type
+                </label>
+                <select
+                  value={typeFilter}
+                  onChange={(e) => setTypeFilter(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">All Types</option>
+                  <option value="university">University</option>
+                  <option value="college">College</option>
+                  <option value="club">Club</option>
+                  <option value="community">Community</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Status
+                </label>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">All Status</option>
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                  <option value="verified">Verified</option>
+                  <option value="unverified">Unverified</option>
+                </select>
+              </div>
+            </div>
+          )}
+        </div>
+      </Card>
+
+      {/* Organizations Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {loading ? (
+          <div className="col-span-full text-center py-12 text-gray-500">
+            Loading...
+          </div>
+        ) : organizations.length === 0 ? (
+          <Card className="col-span-full p-12">
+            <div className="text-center space-y-4">
+              <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto" style={{ background: brandGradient }}>
+                <Building2 className="w-10 h-10 text-white" />
+              </div>
+              <div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                  No organizations found
+                </h3>
+                <p className="text-gray-600 mb-6 max-w-md mx-auto">
+                  {search || typeFilter || statusFilter
+                    ? 'Try adjusting your filters or search terms.'
+                    : 'Get started by creating your first organization. Organizations can be universities, colleges, clubs, or communities.'}
+                </p>
+              </div>
+              {!search && !typeFilter && !statusFilter && (
+                <Link href="/dashboard/organizations/new">
+                  <Button className="rounded-full">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Create Your First Organization
+                  </Button>
+                </Link>
+              )}
+            </div>
+          </Card>
+        ) : (
+          organizations.map((org) => (
+            <Card key={org.id} className="p-6 hover:shadow-lg transition-shadow">
+              {/* Header */}
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  {org.logo_url ? (
+                    <img
+                      src={org.logo_url}
+                      alt={org.name}
+                      className="w-12 h-12 rounded-lg object-cover"
+                    />
+                  ) : (
+                    <div className="w-12 h-12 rounded-lg flex items-center justify-center" style={{ background: brandGradient }}>
+                      <Building2 className="w-6 h-6 text-white" />
+                    </div>
+                  )}
+                  <div className="flex-1">
+                    {getTypeBadge(org.type)}
+                  </div>
+                </div>
+                {org.is_verified && (
+                  <Shield className="w-5 h-5 text-blue-500" />
+                )}
+              </div>
+
+              {/* Organization Info */}
+              <div className="mb-4">
+                <h3 className="text-lg font-bold text-gray-900 mb-1">
+                  {org.name}
+                </h3>
+                {org.parent_org && (
+                  <p className="text-xs text-gray-500 mb-2">
+                    Under: {org.parent_org.name}
+                  </p>
+                )}
+                <p className="text-sm text-gray-600 line-clamp-2">
+                  {org.description || 'No description'}
+                </p>
+              </div>
+
+              {/* Stats */}
+              <div className="flex items-center gap-4 mb-4 text-sm text-gray-600">
+                <div className="flex items-center gap-1">
+                  <Users className="w-4 h-4" />
+                  <span>{org.member_count || 0} members</span>
+                </div>
+                {(org.sub_org_count ?? 0) > 0 && (
+                  <div className="flex items-center gap-1">
+                    <Building2 className="w-4 h-4" />
+                    <span>{org.sub_org_count} sub-orgs</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Status */}
+              <div className="flex items-center gap-2 mb-4">
+                <span
+                  className={`px-2 py-1 text-xs font-medium rounded-full ${
+                    org.is_active
+                      ? 'bg-green-100 text-green-800'
+                      : 'bg-gray-100 text-gray-800'
+                  }`}
+                >
+                  {org.is_active ? 'Active' : 'Inactive'}
+                </span>
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center gap-2 pt-4 border-t">
+                <Link
+                  href={`/dashboard/organizations/${org.id}`}
+                  className="flex-1"
+                >
+                  <Button variant="outline" className="w-full rounded-full" size="sm">
+                    <Eye className="w-4 h-4 mr-2" />
+                    View
+                  </Button>
+                </Link>
+                <Link href={`/dashboard/organizations/${org.id}/edit`}>
+                  <Button variant="outline" className="rounded-full" size="sm">
+                    <Edit className="w-4 h-4" />
+                  </Button>
+                </Link>
+              </div>
+            </Card>
+          ))
+        )}
+      </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-gray-700">
+              Page {page} of {totalPages} ({total.toLocaleString()} total organizations)
+            </div>
+            <div className="flex gap-2">
+              <Button
+                onClick={() => setPage(page - 1)}
+                disabled={page === 1}
+                variant="outline"
+                className="rounded-full"
+              >
+                Previous
+              </Button>
+              <Button
+                onClick={() => setPage(page + 1)}
+                disabled={page === totalPages}
+                variant="outline"
+                className="rounded-full"
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
+    </div>
+  );
+}

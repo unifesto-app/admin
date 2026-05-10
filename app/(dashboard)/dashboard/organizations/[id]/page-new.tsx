@@ -245,7 +245,9 @@ export default function OrganizationDetailPage() {
             <div className="flex items-center gap-3">
               <h1 className="text-3xl font-bold">{organization.name}</h1>
               {organization.super_admin_id && (
-                <Shield className="w-6 h-6 text-blue-600" title="Has Super Admin" />
+                <span title="Has Super Admin">
+                  <Shield className="w-6 h-6 text-blue-600" />
+                </span>
               )}
             </div>
             {organization.hierarchy_path && organization.hierarchy_path.length > 1 && (

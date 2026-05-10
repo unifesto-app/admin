@@ -85,7 +85,9 @@ function TreeNode({ node, level, onNodeClick }: TreeNodeProps) {
               {node.name}
             </button>
             {node.super_admin_id && (
-              <Shield className="w-4 h-4 text-blue-600 flex-shrink-0" title="Has Super Admin" />
+              <span title="Has Super Admin">
+                <Shield className="w-4 h-4 text-blue-600 flex-shrink-0" />
+              </span>
             )}
             {!node.is_active && (
               <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full">

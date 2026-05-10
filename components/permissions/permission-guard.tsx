@@ -270,7 +270,7 @@ export function usePermissions(organizationId?: string) {
   const hasPermission = (permission: keyof UserPermissions['permissions']): boolean => {
     if (isPlatformAdmin) return true;
     if (!permissions) return false;
-    return permissions.permissions[permission];
+    return Boolean(permissions.permissions[permission]);
   };
 
   return {

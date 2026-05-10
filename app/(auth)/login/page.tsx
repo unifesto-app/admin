@@ -118,12 +118,6 @@ function LoginForm() {
       const authDomain = 'https://auth.unifesto.app';
       const redirectTo = `${authDomain}/auth/callback?redirect_origin=${encodeURIComponent(currentOrigin)}`;
       
-      // Debug logging
-      console.log('🔍 OAuth Debug Info:');
-      console.log('  - Current origin:', currentOrigin);
-      console.log('  - Auth domain:', authDomain);
-      console.log('  - Redirect URL:', redirectTo);
-      
       const { data, error: signInError } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -138,10 +132,6 @@ function LoginForm() {
 
       if (signInError) throw signInError;
       if (!data?.url) throw new Error('Failed to generate Google login URL.');
-
-      // Debug: Log the OAuth URL to check redirect_uri parameter
-      console.log('  - OAuth URL:', data.url);
-      console.log('  - Check redirect_uri parameter in URL above');
 
       const popup = window.open(
         data.url,

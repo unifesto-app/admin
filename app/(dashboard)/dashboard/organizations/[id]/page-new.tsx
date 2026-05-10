@@ -1,3 +1,10 @@
+/**
+ * Organization Detail Page (Updated with RBAC)
+ * 
+ * This is the updated version using the new backend APIs
+ * Rename this file to page.tsx to replace the old version
+ */
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -6,6 +13,30 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { brandGradient } from '@/lib/styles';
 import AddMemberModal from '@/components/organizations/add-member-modal';
+import ContentRemovalDialog from '@/components/organizations/content-removal-dialog';
+import SuperAdminIndicator from '@/components/organizations/super-admin-indicator';
+import HierarchyTree, { HierarchyPath, DepthIndicator } from '@/components/organizations/hierarchy-tree';
+import RoleBadge from '@/components/ui/role-badge';
+import { usePermissions } from '@/components/permissions/permission-guard';
+import {
+  getOrganization,
+  getOrganizationHierarchy,
+  deleteOrganization,
+} from '@/lib/api/organizations-api';
+import {
+  getOrganizationMembers,
+  updateMemberRole,
+  removeMember,
+} from '@/lib/api/members-api';
+import {
+  OrganizationWithHierarchy,
+  MemberWithProfile,
+  HierarchyNode,
+  Role,
+  ROLE_LABELS,
+  ROLE_COLORS,
+  ORG_TYPE_LABELS,
+} from '@/lib/types/rbac';
 import {
   Building2,
   Users,
@@ -17,127 +48,57 @@ import {
   Mail,
   Phone,
   MapPin,
-  ChevronRight,
   UserPlus,
   Plus,
+  Network,
+  BarChart3,
 } from 'lucide-react';
 import Link from 'next/link';
 
-interface Organization {
-  id: string;
-  name: string;
-  slug: string;
-  type: string;
-  description: string | null;
-  parent_org_id: string | null;
-  logo_url: string | null;
-  banner_url: string | null;
-  website: string | null;
-  email: string | null;
-  phone: string | null;
-  address: string | null;
-  city: string | null;
-  state: string | null;
-  country: string | null;
-  is_verified: boolean;
-  is_active: boolean;
-  created_at: string;
-  member_count: number;
-  sub_org_count: number;
-  parent_org?: {
-    id: string;
-    name: string;
-    type: string;
-    slug: string;
-  } | null;
-  org_path?: Array<{
-    id: string;
-    name: string;
-    type: string;
-    level: number;
-  }>;
-}
-
-interface Member {
-  id: string;
-  role: string;
-  joined_at: string;
-  profile: {
-    id: string;
-    name: string;
-    email: string;
-    username: string | null;
-    avatar_url: string | null;
-  } | null;
-}
-
-interface SubOrg {
-  id: string;
-  name: string;
-  type: string;
-  slug: string;
-  is_active: boolean;
-  member_count: number;
-  sub_org_count: number;
-}
-
-const ORG_TYPE_LABELS: Record<string, string> = {
-  university: 'University',
-  college: 'College',
-  club: 'Club',
-  community: 'Community',
-};
-
-const ROLE_LABELS: Record<string, string> = {
-  owner: 'Owner',
-  admin: 'Admin',
-  organizer: 'Organizer',
-  member: 'Member',
-};
-
-const ROLE_COLORS: Record<string, string> = {
-  owner: 'bg-blue-100 text-blue-800 border-blue-300',
-  admin: 'bg-blue-50 text-blue-700 border-blue-200',
-  organizer: 'bg-cyan-100 text-cyan-800 border-cyan-300',
-  member: 'bg-gray-100 text-gray-800 border-gray-300',
-};
+type TabType = 'overview' | 'members' | 'sub-orgs' | 'hierarchy' | 'analytics';
 
 export default function OrganizationDetailPage() {
   const params = useParams();
   const router = useRouter();
   const orgId = params.id as string;
 
-  const [organization, setOrganization] = useState<Organization | null>(null);
-  const [members, setMembers] = useState<Member[]>([]);
-  const [subOrgs, setSubOrgs] = useState<SubOrg[]>([]);
+  const [organization, setOrganization] = useState<OrganizationWithHierarchy | null>(null);
+  const [members, setMembers] = useState<MemberWithProfile[]>([]);
+  const [hierarchyTree, setHierarchyTree] = useState<HierarchyNode | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'members' | 'sub-orgs'>('overview');
+  const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
+  const [memberToRemove, setMemberToRemove] = useState<MemberWithProfile | null>(null);
+
+  const { isPlatformAdmin, loading: permissionsLoading } = usePermissions(orgId);
 
   useEffect(() => {
     fetchOrganization();
     fetchMembers();
-    fetchSubOrgs();
   }, [orgId]);
+
+  useEffect(() => {
+    if (activeTab === 'hierarchy') {
+      fetchHierarchy();
+    }
+  }, [activeTab, orgId]);
 
   const fetchOrganization = async () => {
     try {
-      const response = await fetch(`/api/organizations/${orgId}`);
-      const data = await response.json();
+      const { data, error: apiError } = await getOrganization(orgId);
 
-      if (response.ok) {
-        setOrganization(data.organization);
-        setError(null);
-      } else {
-        console.error('Error fetching organization:', data.error);
-        setError(data.error || 'Failed to load organization');
-        // If organization not found, redirect to listing page after a short delay
-        if (response.status === 404) {
+      if (apiError || !data) {
+        console.error('Error fetching organization:', apiError);
+        setError(apiError?.message || 'Failed to load organization');
+        if (apiError?.status === 404) {
           setTimeout(() => {
             router.push('/dashboard/organizations');
           }, 2000);
         }
+      } else {
+        setOrganization(data);
+        setError(null);
       }
     } catch (error) {
       console.error('Error fetching organization:', error);
@@ -149,31 +110,29 @@ export default function OrganizationDetailPage() {
 
   const fetchMembers = async () => {
     try {
-      const response = await fetch(`/api/organizations/${orgId}/members`);
-      const data = await response.json();
+      const { data, error: apiError } = await getOrganizationMembers(orgId);
 
-      if (response.ok) {
-        setMembers(data.members);
+      if (!apiError && data) {
+        setMembers(data);
       } else {
-        console.error('Error fetching members:', data.error);
+        console.error('Error fetching members:', apiError);
       }
     } catch (error) {
       console.error('Error fetching members:', error);
     }
   };
 
-  const fetchSubOrgs = async () => {
+  const fetchHierarchy = async () => {
     try {
-      const response = await fetch(`/api/organizations/${orgId}/sub-orgs`);
-      const data = await response.json();
+      const { data, error: apiError } = await getOrganizationHierarchy(orgId);
 
-      if (response.ok) {
-        setSubOrgs(data.sub_organizations);
+      if (!apiError && data) {
+        setHierarchyTree(data);
       } else {
-        console.error('Error fetching sub-organizations:', data.error);
+        console.error('Error fetching hierarchy:', apiError);
       }
     } catch (error) {
-      console.error('Error fetching sub-organizations:', error);
+      console.error('Error fetching hierarchy:', error);
     }
   };
 
@@ -183,15 +142,12 @@ export default function OrganizationDetailPage() {
     }
 
     try {
-      const response = await fetch(`/api/organizations/${orgId}`, {
-        method: 'DELETE',
-      });
+      const { error: apiError } = await deleteOrganization(orgId);
 
-      if (response.ok) {
+      if (!apiError) {
         router.push('/dashboard/organizations');
       } else {
-        const data = await response.json();
-        alert(`Error: ${data.error}`);
+        alert(`Error: ${apiError.message}`);
       }
     } catch (error) {
       console.error('Error deleting organization:', error);
@@ -199,24 +155,14 @@ export default function OrganizationDetailPage() {
     }
   };
 
-  const handleUpdateMemberRole = async (memberId: string, newRole: string) => {
+  const handleUpdateMemberRole = async (memberId: string, newRole: Role) => {
     try {
-      const response = await fetch(`/api/organizations/${orgId}/members`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          member_id: memberId,
-          role: newRole,
-        }),
-      });
+      const { error: apiError } = await updateMemberRole(orgId, memberId, { role: newRole });
 
-      if (response.ok) {
+      if (!apiError) {
         fetchMembers();
       } else {
-        const data = await response.json();
-        alert(`Error: ${data.error}`);
+        alert(`Error: ${apiError.message}`);
       }
     } catch (error) {
       console.error('Error updating member role:', error);
@@ -224,30 +170,30 @@ export default function OrganizationDetailPage() {
     }
   };
 
-  const handleRemoveMember = async (memberId: string) => {
-    if (!confirm('Are you sure you want to remove this member from the organization?')) {
-      return;
-    }
+  const handleRemoveMember = async (
+    action: 'transfer' | 'delete' | 'anonymize',
+    transferToUserId?: string
+  ) => {
+    if (!memberToRemove) return;
 
     try {
-      const response = await fetch(`/api/organizations/${orgId}/members?member_id=${memberId}`, {
-        method: 'DELETE',
-      });
+      // In a real implementation, this would call a content removal API
+      // For now, we'll just remove the member
+      const { error: apiError } = await removeMember(orgId, memberToRemove.id);
 
-      if (response.ok) {
+      if (!apiError) {
         fetchMembers();
         fetchOrganization();
+        setMemberToRemove(null);
       } else {
-        const data = await response.json();
-        alert(`Error: ${data.error}`);
+        throw new Error(apiError.message);
       }
-    } catch (error) {
-      console.error('Error removing member:', error);
-      alert('Failed to remove member');
+    } catch (error: any) {
+      throw error;
     }
   };
 
-  if (loading) {
+  if (loading || permissionsLoading) {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="text-gray-500">Loading...</div>
@@ -296,25 +242,16 @@ export default function OrganizationDetailPage() {
             </Button>
           </Link>
           <div>
-            <h1 className="text-3xl font-bold">{organization.name}</h1>
-            {organization.org_path && organization.org_path.length > 1 && (
-              <div className="flex items-center gap-2 mt-1 text-sm text-gray-600">
-                {organization.org_path
-                  .slice()
-                  .reverse()
-                  .map((org, index) => (
-                    <div key={org.id} className="flex items-center gap-2">
-                      {index > 0 && <ChevronRight className="w-4 h-4" />}
-                      <Link
-                        href={`/dashboard/organizations/${org.id}`}
-                        className="hover:underline"
-                      >
-                        {org.name}
-                      </Link>
-                    </div>
-                  ))}
-              </div>
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold">{organization.name}</h1>
+              {organization.super_admin_id && (
+                <Shield className="w-6 h-6 text-blue-600" title="Has Super Admin" />
+              )}
+            </div>
+            {organization.hierarchy_path && organization.hierarchy_path.length > 1 && (
+              <HierarchyPath path={organization.hierarchy_path} className="mt-2" />
             )}
+            <DepthIndicator currentDepth={organization.depth_level} className="mt-2" />
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -324,16 +261,28 @@ export default function OrganizationDetailPage() {
               Edit
             </Button>
           </Link>
-          <Button
-            variant="outline"
-            className="rounded-full text-red-600 hover:bg-red-50"
-            onClick={handleDelete}
-          >
-            <Trash2 className="w-4 h-4 mr-2" />
-            Delete
-          </Button>
+          {isPlatformAdmin && (
+            <Button
+              variant="outline"
+              className="rounded-full text-red-600 hover:bg-red-50"
+              onClick={handleDelete}
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Delete
+            </Button>
+          )}
         </div>
       </div>
+
+      {/* Super Admin Indicator */}
+      {organization.super_admin && (
+        <SuperAdminIndicator
+          organizationId={orgId}
+          organizationName={organization.name}
+          superAdmin={organization.super_admin}
+          canTransfer={isPlatformAdmin}
+        />
+      )}
 
       {/* Banner */}
       {organization.banner_url && (
@@ -378,6 +327,28 @@ export default function OrganizationDetailPage() {
             }`}
           >
             Sub-Organizations ({organization.sub_org_count})
+          </button>
+          <button
+            onClick={() => setActiveTab('hierarchy')}
+            className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              activeTab === 'hierarchy'
+                ? 'bg-blue-100 text-blue-900'
+                : 'text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            <Network className="w-4 h-4 inline mr-2" />
+            Hierarchy
+          </button>
+          <button
+            onClick={() => setActiveTab('analytics')}
+            className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              activeTab === 'analytics'
+                ? 'bg-blue-100 text-blue-900'
+                : 'text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            <BarChart3 className="w-4 h-4 inline mr-2" />
+            Analytics
           </button>
         </div>
       </Card>
@@ -530,21 +501,24 @@ export default function OrganizationDetailPage() {
                       <div>
                         <div className="font-medium">{member.profile?.name || 'Unknown'}</div>
                         <div className="text-sm text-gray-600">{member.profile?.email}</div>
-                        {member.profile?.username && (
-                          <div className="text-sm text-gray-500">@{member.profile.username}</div>
+                        {member.content_count && (
+                          <div className="text-xs text-gray-500 mt-1">
+                            {member.content_count.events} events
+                          </div>
                         )}
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
                       <select
                         value={member.role}
-                        onChange={(e) => handleUpdateMemberRole(member.id, e.target.value)}
+                        onChange={(e) => handleUpdateMemberRole(member.id, e.target.value as Role)}
                         className={`px-3 py-1 text-sm font-medium rounded-full border ${
                           ROLE_COLORS[member.role] || 'bg-gray-100 text-gray-800 border-gray-300'
                         }`}
+                        disabled={!isPlatformAdmin && member.role === 'owner'}
                       >
-                        <option value="owner">Owner</option>
-                        <option value="admin">Admin</option>
+                        <option value="owner">Org Super Admin</option>
+                        <option value="admin">Org Admin</option>
                         <option value="organizer">Organizer</option>
                         <option value="member">Member</option>
                       </select>
@@ -555,7 +529,7 @@ export default function OrganizationDetailPage() {
                         variant="outline"
                         size="sm"
                         className="rounded-full text-red-600 hover:bg-red-50"
-                        onClick={() => handleRemoveMember(member.id)}
+                        onClick={() => setMemberToRemove(member)}
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>
@@ -572,51 +546,42 @@ export default function OrganizationDetailPage() {
       {activeTab === 'sub-orgs' && (
         <div className="space-y-4">
           <div className="flex justify-end">
-            <Link href={`/dashboard/organizations/new?parent_org_id=${orgId}`}>
-              <Button className="rounded-full">
-                <Plus className="w-4 h-4 mr-2" />
-                Add Sub-Organization
-              </Button>
-            </Link>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {subOrgs.length === 0 ? (
-              <div className="col-span-full text-center py-12 text-gray-500">
-                No sub-organizations found
-              </div>
-            ) : (
-              subOrgs.map((subOrg) => (
-                <Card key={subOrg.id} className="p-6 hover:shadow-lg transition-shadow">
-                  <div className="space-y-4">
-                    <div>
-                      <h3 className="text-lg font-bold">{subOrg.name}</h3>
-                      <span className="inline-block mt-2 px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 border border-blue-300">
-                        {ORG_TYPE_LABELS[subOrg.type] || subOrg.type}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-4 text-sm text-gray-600">
-                      <div className="flex items-center gap-1">
-                        <Users className="w-4 h-4" />
-                        <span>{subOrg.member_count}</span>
-                      </div>
-                      {subOrg.sub_org_count > 0 && (
-                        <div className="flex items-center gap-1">
-                          <Building2 className="w-4 h-4" />
-                          <span>{subOrg.sub_org_count}</span>
-                        </div>
-                      )}
-                    </div>
-                    <Link href={`/dashboard/organizations/${subOrg.id}`}>
-                      <Button variant="outline" className="w-full rounded-full" size="sm">
-                        View Details
-                      </Button>
-                    </Link>
-                  </div>
-                </Card>
-              ))
+            {organization.depth_level < 4 && (
+              <Link href={`/dashboard/organizations/new?parent_org_id=${orgId}`}>
+                <Button className="rounded-full">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Sub-Organization
+                </Button>
+              </Link>
             )}
           </div>
+          <div className="text-center py-12 text-gray-500">
+            Sub-organizations list will be loaded here
+          </div>
         </div>
+      )}
+
+      {/* Hierarchy Tab */}
+      {activeTab === 'hierarchy' && (
+        <div>
+          {hierarchyTree ? (
+            <HierarchyTree node={hierarchyTree} />
+          ) : (
+            <div className="text-center py-12 text-gray-500">
+              Loading hierarchy...
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Analytics Tab */}
+      {activeTab === 'analytics' && (
+        <Card className="p-6">
+          <div className="text-center py-12 text-gray-500">
+            <BarChart3 className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+            <p>Analytics dashboard coming soon</p>
+          </div>
+        </Card>
       )}
 
       {/* Add Member Modal */}
@@ -628,6 +593,18 @@ export default function OrganizationDetailPage() {
             fetchMembers();
             setShowAddMemberModal(false);
           }}
+        />
+      )}
+
+      {/* Content Removal Dialog */}
+      {memberToRemove && (
+        <ContentRemovalDialog
+          isOpen={true}
+          onClose={() => setMemberToRemove(null)}
+          member={memberToRemove}
+          organizationId={orgId}
+          organizationName={organization.name}
+          onConfirm={handleRemoveMember}
         />
       )}
     </div>

@@ -114,18 +114,35 @@ export interface MemberWithProfile extends Member {
 
 // Event types
 export type EventStatus = 'draft' | 'pending' | 'approved' | 'rejected' | 'published' | 'cancelled';
+export type EventType = 'online' | 'offline' | 'hybrid';
 
 export interface Event {
   id: string;
   title: string;
   description: string | null;
+  short_description: string | null;
+  slug: string | null;
   organization_id: string;
   created_by: string;
   status: EventStatus;
   start_date: string;
   end_date: string;
-  location: string | null;
+  registration_start: string | null;
+  registration_end: string | null;
+  venue: string | null;
+  city: string | null;
+  state: string | null;
+  country: string | null;
+  event_type: EventType;
+  category: string | null;
+  tags: string[] | null;
   image_url: string | null;
+  max_attendees: number | null;
+  is_free: boolean;
+  price: number | null;
+  currency: string | null;
+  is_trending: boolean;
+  is_featured: boolean;
   submitted_for_approval_at: string | null;
   approved_by: string | null;
   approved_at: string | null;

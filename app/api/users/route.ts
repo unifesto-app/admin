@@ -192,6 +192,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    console.log('Creating user with role:', role || 'attendee');
+
     // Create user in Supabase Auth using admin client
     const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
       email,
@@ -204,15 +206,23 @@ export async function POST(request: NextRequest) {
     });
 
     if (createError) {
-      console.error('Error creating user:', createError);
+      console.error('Error creating user in Supabase Auth:', createError);
+      console.error('This error usually means the database constraint needs to be updated.');
+      console.error('Please run: ALTER TABLE profiles DROP CONSTRAINT IF EXISTS profiles_role_check;');
+      console.error('Then run: ALTER TABLE profiles ADD CONSTRAINT profiles_role_check CHECK (role IN (\'attendee\', \'organizer\', \'admin\', \'super_admin\', \'support\'));');
+      
       await logFailure('create_user', 'users', createError.message, {
         userId: user.id,
-        details: { email, name, username },
+        details: { email, name, username, error: createError, requestedRole: role },
         ipAddress: getClientIp(request.headers),
         userAgent: getUserAgent(request.headers),
       });
-      return NextResponse.json({ error: createError.message }, { status: 400 });
+      return NextResponse.json({ 
+        error: `Auth error: ${createError.message}. The database constraint needs to be updated. Please run the SQL migration in QUICK_FIX_USER_ROLES.sql` 
+      }, { status: 400 });
     }
+
+    console.log('User created successfully in Auth, now updating profile...');
 
     // Update profile with additional fields using admin client
     const { data: updatedProfile, error: updateError } = await adminClient
@@ -231,13 +241,21 @@ export async function POST(request: NextRequest) {
 
     if (updateError) {
       console.error('Error updating profile:', updateError);
+      console.error('Profile update details:', { 
+        userId: newUser.user.id, 
+        role: role || 'attendee',
+        updateError 
+      });
       await logFailure('create_user', 'users', updateError.message, {
         userId: user.id,
         resourceId: newUser.user.id,
+        details: { error: updateError, role: role || 'attendee' },
         ipAddress: getClientIp(request.headers),
         userAgent: getUserAgent(request.headers),
       });
-      return NextResponse.json({ error: updateError.message }, { status: 500 });
+      return NextResponse.json({ 
+        error: `Profile update error: ${updateError.message}. ${updateError.hint || ''}` 
+      }, { status: 500 });
     }
 
     await logSuccess('create_user', 'users', {

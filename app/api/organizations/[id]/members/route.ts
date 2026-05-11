@@ -86,12 +86,12 @@ export async function GET(
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    // Fetch profile data for each member
+    // Fetch profile data for each member including platform role
     const enrichedMembers = await Promise.all(
       (members || []).map(async (member) => {
         const { data: profileData } = await adminClient
           .from('profiles')
-          .select('id, name, email, username, avatar_url')
+          .select('id, name, email, username, avatar_url, role')
           .eq('id', member.user_id)
           .single();
 
@@ -177,10 +177,10 @@ export async function POST(
     });
 
     const body = await request.json();
-    const { user_id, role, permissions } = body;
+    const { user_id, relationship_type } = body;
 
     // Validate required fields
-    if (!user_id || !role) {
+    if (!user_id || !relationship_type) {
       await logFailure('add_organization_member', 'organization_members', 'Missing required fields', {
         userId: user.id,
         resourceId: orgId,
@@ -188,23 +188,23 @@ export async function POST(
         userAgent: getUserAgent(request.headers),
       });
       return NextResponse.json(
-        { error: 'User ID and role are required' },
+        { error: 'User ID and relationship type are required' },
         { status: 400 }
       );
     }
 
-    // Validate role
-    const validRoles = ['owner', 'admin', 'organizer', 'member'];
-    if (!validRoles.includes(role)) {
-      await logFailure('add_organization_member', 'organization_members', 'Invalid role', {
+    // Validate relationship_type
+    const validRelationships = ['owner', 'admin', 'member'];
+    if (!validRelationships.includes(relationship_type)) {
+      await logFailure('add_organization_member', 'organization_members', 'Invalid relationship type', {
         userId: user.id,
         resourceId: orgId,
-        details: { role },
+        details: { relationship_type },
         ipAddress: getClientIp(request.headers),
         userAgent: getUserAgent(request.headers),
       });
       return NextResponse.json(
-        { error: 'Invalid role' },
+        { error: 'Invalid relationship type. Must be: owner, admin, or member' },
         { status: 400 }
       );
     }
@@ -258,8 +258,7 @@ export async function POST(
       .insert({
         organization_id: orgId,
         user_id,
-        role,
-        permissions: permissions || {},
+        relationship_type,
       })
       .select()
       .single();
@@ -269,7 +268,7 @@ export async function POST(
       await logFailure('add_organization_member', 'organization_members', createError.message, {
         userId: user.id,
         resourceId: orgId,
-        details: { user_id, role },
+        details: { user_id, relationship_type },
         ipAddress: getClientIp(request.headers),
         userAgent: getUserAgent(request.headers),
       });
@@ -279,7 +278,7 @@ export async function POST(
     await logSuccess('add_organization_member', 'organization_members', {
       userId: user.id,
       resourceId: orgId,
-      details: { user_id, role },
+      details: { user_id, relationship_type },
       ipAddress: getClientIp(request.headers),
       userAgent: getUserAgent(request.headers),
     });
@@ -352,7 +351,7 @@ export async function PATCH(
     });
 
     const body = await request.json();
-    const { member_id, role, permissions } = body;
+    const { member_id, relationship_type } = body;
 
     // Validate required fields
     if (!member_id) {
@@ -368,19 +367,19 @@ export async function PATCH(
       );
     }
 
-    // Validate role if provided
-    if (role) {
-      const validRoles = ['owner', 'admin', 'organizer', 'member'];
-      if (!validRoles.includes(role)) {
-        await logFailure('update_organization_member', 'organization_members', 'Invalid role', {
+    // Validate relationship_type if provided
+    if (relationship_type) {
+      const validRelationships = ['owner', 'admin', 'member'];
+      if (!validRelationships.includes(relationship_type)) {
+        await logFailure('update_organization_member', 'organization_members', 'Invalid relationship type', {
           userId: user.id,
           resourceId: orgId,
-          details: { role },
+          details: { relationship_type },
           ipAddress: getClientIp(request.headers),
           userAgent: getUserAgent(request.headers),
         });
         return NextResponse.json(
-          { error: 'Invalid role' },
+          { error: 'Invalid relationship type. Must be: owner, admin, or member' },
           { status: 400 }
         );
       }
@@ -388,8 +387,7 @@ export async function PATCH(
 
     // Build update object
     const updateData: any = {};
-    if (role !== undefined) updateData.role = role;
-    if (permissions !== undefined) updateData.permissions = permissions;
+    if (relationship_type !== undefined) updateData.relationship_type = relationship_type;
 
     // Update member
     const { data: updatedMember, error: updateError } = await adminClient

@@ -60,7 +60,7 @@ interface Organization {
 
 interface Member {
   id: string;
-  role: string;
+  relationship_type: string;
   joined_at: string;
   profile: {
     id: string;
@@ -68,6 +68,7 @@ interface Member {
     email: string;
     username: string | null;
     avatar_url: string | null;
+    role: string; // Unified platform role
   } | null;
 }
 
@@ -88,18 +89,24 @@ const ORG_TYPE_LABELS: Record<string, string> = {
   community: 'Community',
 };
 
-const ROLE_LABELS: Record<string, string> = {
+const RELATIONSHIP_LABELS: Record<string, string> = {
   owner: 'Owner',
   admin: 'Admin',
-  organizer: 'Organizer',
   member: 'Member',
 };
 
-const ROLE_COLORS: Record<string, string> = {
-  owner: 'bg-blue-100 text-blue-800 border-blue-300',
-  admin: 'bg-blue-50 text-blue-700 border-blue-200',
-  organizer: 'bg-cyan-100 text-cyan-800 border-cyan-300',
-  member: 'bg-gray-100 text-gray-800 border-gray-300',
+const RELATIONSHIP_COLORS: Record<string, string> = {
+  owner: 'bg-primary/10 text-primary border-primary/20',
+  admin: 'bg-muted text-foreground border-border',
+  member: 'bg-muted text-muted-foreground border-border',
+};
+
+const PLATFORM_ROLE_LABELS: Record<string, string> = {
+  super_admin: 'Super Admin',
+  org_super_admin: 'Org Super Admin',
+  org_admin: 'Org Admin',
+  organizer: 'Organizer',
+  attendee: 'Attendee',
 };
 
 export default function OrganizationDetailPage() {
@@ -199,7 +206,7 @@ export default function OrganizationDetailPage() {
     }
   };
 
-  const handleUpdateMemberRole = async (memberId: string, newRole: string) => {
+  const handleUpdateMemberRelationship = async (memberId: string, newRelationship: string) => {
     try {
       const response = await fetch(`/api/organizations/${orgId}/members`, {
         method: 'PATCH',
@@ -208,7 +215,7 @@ export default function OrganizationDetailPage() {
         },
         body: JSON.stringify({
           member_id: memberId,
-          role: newRole,
+          relationship_type: newRelationship,
         }),
       });
 
@@ -219,8 +226,8 @@ export default function OrganizationDetailPage() {
         alert(`Error: ${data.error}`);
       }
     } catch (error) {
-      console.error('Error updating member role:', error);
-      alert('Failed to update member role');
+      console.error('Error updating member relationship:', error);
+      alert('Failed to update member relationship');
     }
   };
 
@@ -353,8 +360,8 @@ export default function OrganizationDetailPage() {
             onClick={() => setActiveTab('overview')}
             className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               activeTab === 'overview'
-                ? 'bg-blue-100 text-blue-900'
-                : 'text-gray-600 hover:bg-gray-100'
+                ? 'bg-primary/10 text-primary'
+                : 'text-muted-foreground hover:bg-muted'
             }`}
           >
             Overview
@@ -363,8 +370,8 @@ export default function OrganizationDetailPage() {
             onClick={() => setActiveTab('members')}
             className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               activeTab === 'members'
-                ? 'bg-blue-100 text-blue-900'
-                : 'text-gray-600 hover:bg-gray-100'
+                ? 'bg-primary/10 text-primary'
+                : 'text-muted-foreground hover:bg-muted'
             }`}
           >
             Members ({organization.member_count})
@@ -373,8 +380,8 @@ export default function OrganizationDetailPage() {
             onClick={() => setActiveTab('sub-orgs')}
             className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               activeTab === 'sub-orgs'
-                ? 'bg-blue-100 text-blue-900'
-                : 'text-gray-600 hover:bg-gray-100'
+                ? 'bg-primary/10 text-primary'
+                : 'text-muted-foreground hover:bg-muted'
             }`}
           >
             Sub-Organizations ({organization.sub_org_count})
@@ -401,11 +408,11 @@ export default function OrganizationDetailPage() {
               )}
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="px-3 py-1 text-sm font-medium rounded-full bg-blue-100 text-blue-800 border border-blue-300">
+                  <span className="px-3 py-1 text-sm font-medium rounded-full bg-primary/10 text-primary border border-primary/20">
                     {ORG_TYPE_LABELS[organization.type] || organization.type}
                   </span>
                   {organization.is_verified && (
-                    <span className="flex items-center gap-1 px-3 py-1 text-sm font-medium rounded-full bg-green-100 text-green-800 border border-green-300">
+                    <span className="flex items-center gap-1 px-3 py-1 text-sm font-medium rounded-full bg-muted text-foreground border border-border">
                       <Shield className="w-4 h-4" />
                       Verified
                     </span>
@@ -413,8 +420,8 @@ export default function OrganizationDetailPage() {
                   <span
                     className={`px-3 py-1 text-sm font-medium rounded-full ${
                       organization.is_active
-                        ? 'bg-green-100 text-green-800 border border-green-300'
-                        : 'bg-gray-100 text-gray-800 border border-gray-300'
+                        ? 'bg-muted text-foreground border border-border'
+                        : 'bg-muted text-muted-foreground border border-border'
                     }`}
                   >
                     {organization.is_active ? 'Active' : 'Inactive'}
@@ -513,7 +520,7 @@ export default function OrganizationDetailPage() {
                 members.map((member) => (
                   <div
                     key={member.id}
-                    className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50"
+                    className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/30"
                   >
                     <div className="flex items-center gap-4">
                       {member.profile?.avatar_url ? (
@@ -523,38 +530,45 @@ export default function OrganizationDetailPage() {
                           className="w-12 h-12 rounded-full object-cover"
                         />
                       ) : (
-                        <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
-                          <Users className="w-6 h-6 text-blue-600" />
+                        <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+                          <Users className="w-6 h-6 text-muted-foreground" />
                         </div>
                       )}
                       <div>
                         <div className="font-medium">{member.profile?.name || 'Unknown'}</div>
-                        <div className="text-sm text-gray-600">{member.profile?.email}</div>
+                        <div className="text-sm text-muted-foreground">{member.profile?.email}</div>
                         {member.profile?.username && (
-                          <div className="text-sm text-gray-500">@{member.profile.username}</div>
+                          <div className="text-sm text-muted-foreground">@{member.profile.username}</div>
+                        )}
+                        {member.profile?.role && (
+                          <div className="text-xs text-muted-foreground mt-1">
+                            Platform Role: {PLATFORM_ROLE_LABELS[member.profile.role] || member.profile.role}
+                          </div>
                         )}
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
-                      <select
-                        value={member.role}
-                        onChange={(e) => handleUpdateMemberRole(member.id, e.target.value)}
-                        className={`px-3 py-1 text-sm font-medium rounded-full border ${
-                          ROLE_COLORS[member.role] || 'bg-gray-100 text-gray-800 border-gray-300'
-                        }`}
-                      >
-                        <option value="owner">Owner</option>
-                        <option value="admin">Admin</option>
-                        <option value="organizer">Organizer</option>
-                        <option value="member">Member</option>
-                      </select>
-                      <div className="text-sm text-gray-500">
+                      <div className="text-right">
+                        <div className="text-sm font-medium mb-1">Organization Role</div>
+                        <select
+                          value={member.relationship_type}
+                          onChange={(e) => handleUpdateMemberRelationship(member.id, e.target.value)}
+                          className={`px-3 py-1 text-sm font-medium rounded-full border ${
+                            RELATIONSHIP_COLORS[member.relationship_type] || 'bg-muted text-muted-foreground border-border'
+                          }`}
+                        >
+                          <option value="owner">Owner</option>
+                          <option value="admin">Admin</option>
+                          <option value="member">Member</option>
+                        </select>
+                      </div>
+                      <div className="text-sm text-muted-foreground">
                         Joined {new Date(member.joined_at).toLocaleDateString()}
                       </div>
                       <Button
                         variant="outline"
                         size="sm"
-                        className="rounded-full text-red-600 hover:bg-red-50"
+                        className="rounded-full text-destructive hover:bg-destructive/10"
                         onClick={() => handleRemoveMember(member.id)}
                       >
                         <Trash2 className="w-4 h-4" />
@@ -590,7 +604,7 @@ export default function OrganizationDetailPage() {
                   <div className="space-y-4">
                     <div>
                       <h3 className="text-lg font-bold">{subOrg.name}</h3>
-                      <span className="inline-block mt-2 px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 border border-blue-300">
+                      <span className="inline-block mt-2 px-2 py-1 text-xs font-medium rounded-full bg-primary/10 text-primary border border-primary/20">
                         {ORG_TYPE_LABELS[subOrg.type] || subOrg.type}
                       </span>
                     </div>

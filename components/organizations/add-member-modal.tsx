@@ -27,7 +27,7 @@ export default function AddMemberModal({
   const [users, setUsers] = useState<User[]>([]);
   const [search, setSearch] = useState('');
   const [selectedUserId, setSelectedUserId] = useState('');
-  const [role, setRole] = useState('member');
+  const [relationshipType, setRelationshipType] = useState('member');
   const [loading, setLoading] = useState(false);
   const [searching, setSearching] = useState(false);
 
@@ -78,7 +78,7 @@ export default function AddMemberModal({
         },
         body: JSON.stringify({
           user_id: selectedUserId,
-          role,
+          relationship_type: relationshipType,
         }),
       });
 
@@ -163,27 +163,25 @@ export default function AddMemberModal({
             )}
           </div>
 
-          {/* Role Selection */}
+          {/* Relationship Type Selection */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Role <span className="text-red-500">*</span>
+              Organization Relationship <span className="text-red-500">*</span>
             </label>
             <select
-              value={role}
-              onChange={(e) => setRole(e.target.value)}
+              value={relationshipType}
+              onChange={(e) => setRelationshipType(e.target.value)}
               required
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="member">Member</option>
-              <option value="organizer">Organizer</option>
               <option value="admin">Admin</option>
               <option value="owner">Owner</option>
             </select>
             <p className="text-xs text-gray-500 mt-1">
-              {role === 'owner' && 'Full control over the organization'}
-              {role === 'admin' && 'Can manage members and settings'}
-              {role === 'organizer' && 'Can create and manage events'}
-              {role === 'member' && 'Basic member access'}
+              {relationshipType === 'owner' && 'Full control over the organization'}
+              {relationshipType === 'admin' && 'Can manage members and settings'}
+              {relationshipType === 'member' && 'Basic member access'}
             </p>
           </div>
 

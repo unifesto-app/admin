@@ -129,14 +129,33 @@ export default function UsersPage() {
     fetchUsers();
   };
 
+  const getRoleLabel = (role: string) => {
+    switch (role) {
+      case 'super_admin':
+        return 'Super Admin';
+      case 'org_super_admin':
+        return 'Org Super Admin';
+      case 'org_admin':
+        return 'Org Admin';
+      case 'organizer':
+        return 'Organizer';
+      case 'attendee':
+        return 'Attendee';
+      default:
+        return role.replace('_', ' ');
+    }
+  };
+
   const getRoleBadgeColor = (role: string) => {
     switch (role) {
       case 'super_admin':
         return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200';
-      case 'admin':
+      case 'org_super_admin':
+        return 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200';
+      case 'org_admin':
         return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
       case 'organizer':
-        return 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200';
+        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
       default:
         return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200';
     }
@@ -239,7 +258,8 @@ export default function UsersPage() {
                 <option value="">All Roles</option>
                 <option value="attendee">Attendee</option>
                 <option value="organizer">Organizer</option>
-                <option value="admin">Admin</option>
+                <option value="org_admin">Org Admin</option>
+                <option value="org_super_admin">Org Super Admin</option>
                 <option value="super_admin">Super Admin</option>
               </select>
 
@@ -374,7 +394,7 @@ export default function UsersPage() {
                         </td>
                         <td className="p-3">
                           <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getRoleBadgeColor(user.role)}`}>
-                            {user.role.replace('_', ' ')}
+                            {getRoleLabel(user.role)}
                           </span>
                         </td>
                         <td className="p-3">

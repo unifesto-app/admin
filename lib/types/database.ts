@@ -6,7 +6,7 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[];
 
-export type PlatformRole = 'attendee' | 'organizer' | 'admin' | 'super_admin';
+export type PlatformRole = 'attendee' | 'organizer' | 'org_admin' | 'org_super_admin' | 'super_admin';
 
 export interface Profile {
   id: string;
@@ -44,11 +44,35 @@ export interface Event {
   id: string;
   title: string;
   description: string | null;
+  short_description: string | null;
+  slug: string | null;
   organization_id: string;
+  created_by: string;
   start_date: string;
   end_date: string;
-  location: string | null;
-  status: 'draft' | 'published' | 'cancelled';
+  registration_start: string | null;
+  registration_end: string | null;
+  venue: string | null;
+  city: string | null;
+  state: string | null;
+  country: string | null;
+  event_type: 'online' | 'offline' | 'hybrid';
+  category: string | null;
+  tags: string[] | null;
+  image_url: string | null;
+  max_attendees: number | null;
+  is_free: boolean;
+  price: number | null;
+  currency: string | null;
+  status: 'draft' | 'pending' | 'approved' | 'rejected' | 'published' | 'cancelled';
+  is_trending: boolean;
+  is_featured: boolean;
+  submitted_for_approval_at: string | null;
+  approved_by: string | null;
+  approved_at: string | null;
+  rejected_at: string | null;
+  rejection_reason: string | null;
+  ownership_status: 'active' | 'transferred' | 'anonymized' | 'deleted';
   created_at: string;
   updated_at: string;
 }

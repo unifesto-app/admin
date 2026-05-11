@@ -23,7 +23,7 @@ export default function UserFormModal({ user, isOpen, onClose, onSuccess }: User
     username: '',
     phone: '',
     bio: '',
-    role: 'attendee' as 'attendee' | 'organizer' | 'admin' | 'super_admin',
+    role: 'attendee' as 'attendee' | 'organizer' | 'org_admin' | 'org_super_admin' | 'super_admin',
     is_active: true,
     is_verified: false,
   });
@@ -95,7 +95,17 @@ export default function UserFormModal({ user, isOpen, onClose, onSuccess }: User
       onSuccess();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save user');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to save user';
+      console.error('User creation error:', err);
+      
+      // Check if it's a role constraint error
+      if (errorMessage.toLowerCase().includes('role') && 
+          (errorMessage.toLowerCase().includes('check constraint') || 
+           errorMessage.toLowerCase().includes('violates check'))) {
+        setError('Database error: The selected role is not allowed. Please run the SQL migration to fix this. See QUICK_FIX_USER_ROLES.sql in the project root.');
+      } else {
+        setError(errorMessage);
+      }
     } finally {
       setLoading(false);
     }
@@ -118,8 +128,20 @@ export default function UserFormModal({ user, isOpen, onClose, onSuccess }: User
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
           {error && (
-            <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md">
-              {error}
+            <div className="p-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md">
+              <div className="font-semibold mb-2">❌ {error}</div>
+              {error.includes('database constraint') || error.includes('SQL migration') ? (
+                <div className="text-xs mt-2 space-y-1">
+                  <p className="font-semibold">To fix this error:</p>
+                  <ol className="list-decimal ml-4 space-y-1">
+                    <li>Open Supabase Dashboard → SQL Editor</li>
+                    <li>Copy & paste the SQL from <code className="bg-red-100 px-1 rounded">QUICK_FIX_USER_ROLES.sql</code></li>
+                    <li>Click "Run" to execute</li>
+                    <li>Try creating the user again</li>
+                  </ol>
+                  <p className="mt-2">See <code className="bg-red-100 px-1 rounded">FIX_USER_CREATION_ERROR.md</code> for detailed instructions.</p>
+                </div>
+              ) : null}
             </div>
           )}
 
@@ -200,7 +222,8 @@ export default function UserFormModal({ user, isOpen, onClose, onSuccess }: User
               >
                 <option value="attendee">Attendee</option>
                 <option value="organizer">Organizer</option>
-                <option value="admin">Admin</option>
+                <option value="org_admin">Org Admin</option>
+                <option value="org_super_admin">Org Super Admin</option>
                 <option value="super_admin">Super Admin</option>
               </select>
             </div>

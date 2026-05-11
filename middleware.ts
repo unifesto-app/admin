@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 
-const ADMIN_ROLES = new Set(['super_admin', 'admin']);
+const ADMIN_ROLES = new Set(['super_admin']);
 const DEFAULT_ADMIN_EMAIL = 'unifestoapp@gmail.com';
 const LOGIN_RATE_LIMIT_WINDOW_MS = 60_000;
 const LOGIN_RATE_LIMIT_MAX_REQUESTS = 40;

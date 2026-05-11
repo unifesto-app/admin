@@ -82,6 +82,21 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
     fetchUser();
   };
 
+  const getRoleLabel = (role: string) => {
+    switch (role) {
+      case 'super_admin':
+        return 'Platform Super Admin';
+      case 'admin':
+        return 'Platform Admin';
+      case 'organizer':
+        return 'Organizer';
+      case 'attendee':
+        return 'Attendee';
+      default:
+        return role.replace('_', ' ');
+    }
+  };
+
   const getRoleBadgeColor = (role: string) => {
     switch (role) {
       case 'super_admin':
@@ -191,7 +206,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                 <div className="flex gap-2 mt-3">
                   <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getRoleBadgeColor(user.role)}`}>
                     <Shield className="mr-1 h-3 w-3" />
-                    {user.role.replace('_', ' ')}
+                    {getRoleLabel(user.role)}
                   </span>
                   <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusBadgeColor(user)}`}>
                     {getStatusText(user)}

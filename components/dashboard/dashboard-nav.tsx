@@ -21,6 +21,7 @@ import {
   Wallet,
   Gift,
   Activity,
+  Tag,
 } from 'lucide-react';
 
 const navItems = [
@@ -28,6 +29,7 @@ const navItems = [
   { href: '/dashboard/users', label: 'Users', icon: Users },
   { href: '/dashboard/wallet', label: 'Wallet', icon: Wallet },
   { href: '/dashboard/referrals', label: 'Referrals', icon: Gift },
+  { href: '/dashboard/redeem-codes', label: 'Redeem Codes', icon: Tag },
   { href: '/dashboard/organizations', label: 'Organizations', icon: Building2 },
   { href: '/dashboard/events', label: 'Events', icon: Calendar },
   { href: '/dashboard/transactions', label: 'Transactions', icon: CreditCard },

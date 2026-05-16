@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createServiceRoleClient } from '@/lib/supabase/service-role';
 
 /**
  * GET /api/wallet
@@ -7,7 +8,16 @@ import { createClient } from '@/lib/supabase/server';
  */
 export async function GET(request: NextRequest) {
   try {
+    // First verify the user is authenticated
     const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Use service role client to bypass RLS for admin operations
+    const supabaseAdmin = createServiceRoleClient();
     const searchParams = request.nextUrl.searchParams;
 
     // Pagination
@@ -21,7 +31,7 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search');
 
     // Build query - fetch wallets first
-    let walletQuery = supabase
+    let walletQuery = supabaseAdmin
       .from('wallets')
       .select('*', { count: 'exact' });
 
@@ -62,7 +72,7 @@ export async function GET(request: NextRequest) {
 
     // Fetch profiles for all user_ids
     const userIds = wallets.map(w => w.user_id);
-    const { data: profiles, error: profileError } = await supabase
+    const { data: profiles, error: profileError } = await supabaseAdmin
       .from('profiles')
       .select('id, name, username, email, avatar_url')
       .in('id', userIds);

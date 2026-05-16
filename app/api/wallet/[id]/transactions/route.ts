@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createServiceRoleClient } from '@/lib/supabase/service-role';
 
 /**
  * GET /api/wallet/[id]/transactions
@@ -11,7 +12,17 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
+    
+    // Verify authentication
     const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Use service role client to bypass RLS
+    const supabaseAdmin = createServiceRoleClient();
     const searchParams = request.nextUrl.searchParams;
 
     // Pagination
@@ -23,7 +34,7 @@ export async function GET(
     const type = searchParams.get('type');
 
     // Build query
-    let query = supabase
+    let query = supabaseAdmin
       .from('transactions')
       .select('*', { count: 'exact' })
       .eq('user_id', id);
@@ -76,7 +87,17 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
+    
+    // Verify authentication
     const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Use service role client to bypass RLS
+    const supabaseAdmin = createServiceRoleClient();
     const body = await request.json();
 
     const { amount, type, description, metadata = {} } = body;
@@ -90,7 +111,7 @@ export async function POST(
     }
 
     // Call the database function to update wallet balance
-    const { data, error } = await supabase.rpc('update_wallet_balance', {
+    const { data, error } = await supabaseAdmin.rpc('update_wallet_balance', {
       p_user_id: id,
       p_amount: amount,
       p_type: type,
@@ -107,7 +128,7 @@ export async function POST(
     }
 
     // Fetch the created transaction
-    const { data: transaction, error: txError } = await supabase
+    const { data: transaction, error: txError } = await supabaseAdmin
       .from('transactions')
       .select('*')
       .eq('id', data.transaction_id)

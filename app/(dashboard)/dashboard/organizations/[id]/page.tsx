@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { brandGradient } from '@/lib/styles';
 import AddMemberModal from '@/components/organizations/add-member-modal';
 import {
@@ -256,8 +257,94 @@ export default function OrganizationDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-gray-500">Loading...</div>
+      <div className="space-y-6">
+        {/* Header Skeleton */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Skeleton className="h-9 w-20 rounded-full" />
+            <div>
+              <Skeleton className="h-9 w-64 mb-2" />
+              <Skeleton className="h-4 w-48" />
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-9 w-24 rounded-full" />
+            <Skeleton className="h-9 w-24 rounded-full" />
+          </div>
+        </div>
+
+        {/* Banner Skeleton */}
+        <Skeleton className="w-full h-48 rounded-lg" />
+
+        {/* Tabs Skeleton */}
+        <Card className="p-1">
+          <div className="flex gap-1">
+            <Skeleton className="flex-1 h-10 rounded-lg" />
+            <Skeleton className="flex-1 h-10 rounded-lg" />
+            <Skeleton className="flex-1 h-10 rounded-lg" />
+          </div>
+        </Card>
+
+        {/* Content Skeleton */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Main Info Skeleton */}
+          <Card className="lg:col-span-2 p-6 space-y-6">
+            <div className="flex items-start gap-4">
+              <Skeleton className="w-20 h-20 rounded-lg" />
+              <div className="flex-1 space-y-3">
+                <div className="flex items-center gap-2">
+                  <Skeleton className="h-6 w-24 rounded-full" />
+                  <Skeleton className="h-6 w-20 rounded-full" />
+                  <Skeleton className="h-6 w-16 rounded-full" />
+                </div>
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-3/4" />
+              </div>
+            </div>
+
+            {/* Contact Info Skeleton */}
+            <div className="space-y-3 pt-6 border-t">
+              <Skeleton className="h-6 w-48 mb-4" />
+              <div className="flex items-center gap-3">
+                <Skeleton className="w-5 h-5 rounded" />
+                <Skeleton className="h-4 w-64" />
+              </div>
+              <div className="flex items-center gap-3">
+                <Skeleton className="w-5 h-5 rounded" />
+                <Skeleton className="h-4 w-48" />
+              </div>
+              <div className="flex items-center gap-3">
+                <Skeleton className="w-5 h-5 rounded" />
+                <Skeleton className="h-4 w-40" />
+              </div>
+              <div className="flex items-start gap-3">
+                <Skeleton className="w-5 h-5 rounded" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-3/4" />
+                </div>
+              </div>
+            </div>
+          </Card>
+
+          {/* Stats Skeleton */}
+          <div className="space-y-4">
+            <Card className="p-6">
+              <div className="flex items-center gap-3 mb-2">
+                <Skeleton className="w-5 h-5 rounded" />
+                <Skeleton className="h-5 w-20" />
+              </div>
+              <Skeleton className="h-9 w-16" />
+            </Card>
+            <Card className="p-6">
+              <div className="flex items-center gap-3 mb-2">
+                <Skeleton className="w-5 h-5 rounded" />
+                <Skeleton className="h-5 w-32" />
+              </div>
+              <Skeleton className="h-9 w-16" />
+            </Card>
+          </div>
+        </div>
       </div>
     );
   }

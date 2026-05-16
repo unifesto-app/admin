@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Referral, ReferralCode } from '@/lib/types/database';
-import { Search, Filter, Users, Award, TrendingUp } from 'lucide-react';
+import { Search, Filter, Users, Award, TrendingUp, Gift, Coins, Save, RefreshCw, Settings } from 'lucide-react';
 import Link from 'next/link';
 
 interface ReferralWithProfiles extends Referral {
@@ -35,7 +35,7 @@ interface ReferralCodeWithProfile extends ReferralCode {
 }
 
 export default function ReferralManagementPage() {
-  const [activeTab, setActiveTab] = useState<'referrals' | 'codes'>('referrals');
+  const [activeTab, setActiveTab] = useState<'referrals' | 'codes' | 'settings'>('referrals');
   const [referrals, setReferrals] = useState<ReferralWithProfiles[]>([]);
   const [codes, setCodes] = useState<ReferralCodeWithProfile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,6 +45,14 @@ export default function ReferralManagementPage() {
   const [activeFilter, setActiveFilter] = useState('');
   const [search, setSearch] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+
+  // Settings state
+  const [settings, setSettings] = useState<Record<string, any>>({
+    referral_reward_amount: 25,
+    welcome_bonus_amount: 25,
+  });
+  const [saving, setSaving] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
 
   const fetchReferrals = async () => {
     try {
@@ -102,10 +110,79 @@ export default function ReferralManagementPage() {
   useEffect(() => {
     if (activeTab === 'referrals') {
       fetchReferrals();
-    } else {
+    } else if (activeTab === 'codes') {
       fetchCodes();
+    } else if (activeTab === 'settings') {
+      fetchSettings();
     }
   }, [page, activeTab]);
+
+  const fetchSettings = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/settings');
+      
+      if (response.ok) {
+        const data = await response.json();
+        const settingsMap: Record<string, any> = {};
+        
+        data.settings.forEach((setting: any) => {
+          settingsMap[setting.key] = setting.value;
+        });
+        
+        setSettings(settingsMap);
+      }
+    } catch (error) {
+      console.error('Error fetching settings:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSettingChange = (key: string, value: any) => {
+    setSettings((prev) => ({ ...prev, [key]: value }));
+    setHasChanges(true);
+  };
+
+  const handleSaveSettings = async () => {
+    try {
+      setSaving(true);
+
+      const promises = Object.entries(settings).map(([key, value]) =>
+        fetch('/api/settings', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key, value }),
+        })
+      );
+
+      const results = await Promise.all(promises);
+      const allSuccessful = results.every((r) => r.ok);
+
+      if (allSuccessful) {
+        alert('Settings saved successfully!');
+        setHasChanges(false);
+        fetchSettings();
+      } else {
+        alert('Some settings failed to save. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error saving settings:', error);
+      alert('Failed to save settings');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleResetSettings = () => {
+    if (confirm('Are you sure you want to reset to default values?')) {
+      setSettings({
+        referral_reward_amount: 25,
+        welcome_bonus_amount: 25,
+      });
+      setHasChanges(true);
+    }
+  };
 
   const handleSearch = () => {
     setPage(1);
@@ -172,6 +249,20 @@ export default function ReferralManagementPage() {
         >
           <Award className="w-4 h-4 inline mr-2" />
           Referral Codes
+        </button>
+        <button
+          onClick={() => {
+            setActiveTab('settings');
+            setPage(1);
+          }}
+          className={`px-4 py-2 font-medium border-b-2 transition-colors ${
+            activeTab === 'settings'
+              ? 'border-purple-600 text-purple-600'
+              : 'border-transparent text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          <Settings className="w-4 h-4 inline mr-2" />
+          Settings
         </button>
       </div>
 
@@ -248,7 +339,149 @@ export default function ReferralManagementPage() {
       )}
 
       {/* Content */}
-      {activeTab === 'referrals' ? (
+      {activeTab === 'settings' ? (
+        <div className="space-y-6 max-w-4xl">
+          {/* Header Actions */}
+          <div className="flex items-center justify-end gap-2">
+            <Button
+              onClick={handleResetSettings}
+              variant="outline"
+              className="rounded-full"
+              disabled={saving}
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Reset to Defaults
+            </Button>
+            <Button
+              onClick={handleSaveSettings}
+              disabled={!hasChanges || saving}
+              className="rounded-full"
+            >
+              <Save className="w-4 h-4 mr-2" />
+              {saving ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </div>
+
+          {hasChanges && (
+            <Card className="p-4 bg-yellow-50 border-yellow-200">
+              <div className="flex items-center text-yellow-800">
+                <Settings className="w-5 h-5 mr-2" />
+                <span className="font-semibold">You have unsaved changes</span>
+              </div>
+            </Card>
+          )}
+
+          {/* Referral Settings */}
+          <Card className="p-6">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center">
+                <Gift className="w-6 h-6 text-purple-600" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold">Referral Rewards Configuration</h2>
+                <p className="text-sm text-gray-600">Configure referral rewards and bonuses</p>
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              {/* Referral Reward Amount */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Referral Reward Amount
+                </label>
+                <p className="text-sm text-gray-600 mb-3">
+                  Number of coins awarded to the referrer when someone uses their referral code
+                </p>
+                <div className="flex items-center gap-4">
+                  <div className="relative flex-1 max-w-xs">
+                    <Coins className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <input
+                      type="number"
+                      value={settings.referral_reward_amount || 25}
+                      onChange={(e) =>
+                        handleSettingChange('referral_reward_amount', parseInt(e.target.value) || 0)
+                      }
+                      min="0"
+                      step="5"
+                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-lg font-semibold"
+                    />
+                  </div>
+                  <span className="text-gray-600">coins per referral</span>
+                </div>
+                <div className="mt-2 p-3 bg-blue-50 rounded-lg">
+                  <p className="text-sm text-blue-800">
+                    <strong>Example:</strong> If set to {settings.referral_reward_amount || 25}, when
+                    Alice refers Bob, Alice receives {settings.referral_reward_amount || 25} coins
+                    after Bob signs up.
+                  </p>
+                </div>
+              </div>
+
+              {/* Welcome Bonus Amount */}
+              <div className="pt-6 border-t">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Welcome Bonus Amount
+                </label>
+                <p className="text-sm text-gray-600 mb-3">
+                  Number of coins awarded to new users who sign up using a referral code
+                </p>
+                <div className="flex items-center gap-4">
+                  <div className="relative flex-1 max-w-xs">
+                    <Coins className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <input
+                      type="number"
+                      value={settings.welcome_bonus_amount || 25}
+                      onChange={(e) =>
+                        handleSettingChange('welcome_bonus_amount', parseInt(e.target.value) || 0)
+                      }
+                      min="0"
+                      step="5"
+                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-lg font-semibold"
+                    />
+                  </div>
+                  <span className="text-gray-600">coins for new users</span>
+                </div>
+                <div className="mt-2 p-3 bg-blue-50 rounded-lg">
+                  <p className="text-sm text-blue-800">
+                    <strong>Example:</strong> If set to {settings.welcome_bonus_amount || 25}, when Bob
+                    signs up using Alice's referral code, Bob receives{' '}
+                    {settings.welcome_bonus_amount || 25} coins as a welcome bonus.
+                  </p>
+                </div>
+              </div>
+
+              {/* Total Reward Summary */}
+              <div className="pt-6 border-t">
+                <div className="p-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg border border-purple-200">
+                  <h3 className="font-semibold text-purple-900 mb-2">Total Reward Per Referral</h3>
+                  <div className="flex items-center gap-2">
+                    <Coins className="w-6 h-6 text-yellow-500" />
+                    <span className="text-3xl font-bold text-purple-900">
+                      {(settings.referral_reward_amount || 25) +
+                        (settings.welcome_bonus_amount || 25)}
+                    </span>
+                    <span className="text-purple-700">coins distributed per successful referral</span>
+                  </div>
+                  <div className="mt-3 text-sm text-purple-800">
+                    <div className="flex justify-between">
+                      <span>Referrer receives:</span>
+                      <span className="font-semibold">
+                        {settings.referral_reward_amount || 25} coins
+                      </span>
+                    </div>
+                    <div className="flex justify-between mt-1">
+                      <span>New user receives:</span>
+                      <span className="font-semibold">
+                        {settings.welcome_bonus_amount || 25} coins
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Card>
+        </div>
+      ) : activeTab === 'referrals' ? (
         <Card>
           <div className="overflow-x-auto">
             <table className="w-full">

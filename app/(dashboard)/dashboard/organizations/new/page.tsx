@@ -81,7 +81,7 @@ export default function NewOrganizationPage() {
         const slug = value
           .toLowerCase()
           .replace(/[^a-z0-9]+/g, '-')
-          .replace(/^-|-$/g, '');
+          .replace(/^-+|-+$/g, ''); // Remove leading/trailing hyphens
         setFormData((prev) => ({ ...prev, slug }));
       }
     }
@@ -165,11 +165,15 @@ export default function NewOrganizationPage() {
                   value={formData.slug}
                   onChange={handleChange}
                   required
-                  pattern="[a-z0-9-]+"
+                  minLength={3}
+                  maxLength={50}
+                  pattern="^[a-z0-9]+(?:-[a-z0-9]+)*$"
+                  title="Slug must be 3-50 characters, lowercase letters, numbers, and hyphens only (cannot start or end with hyphen)"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="my-organization"
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  Lowercase letters, numbers, and hyphens only
+                  3-50 characters. Lowercase letters, numbers, and hyphens only. Cannot start or end with hyphen.
                 </p>
               </div>
               <div>

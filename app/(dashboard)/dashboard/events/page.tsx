@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { brandGradient } from '@/lib/styles';
 import {
   Search,
@@ -396,9 +397,49 @@ export default function EventsPage() {
       {/* Events Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {loading ? (
-          <div className="col-span-full text-center py-12 text-gray-500">
-            Loading events...
-          </div>
+          // Skeleton Loading
+          Array.from({ length: 6 }).map((_, index) => (
+            <Card key={index} className="p-6">
+              {/* Header with badges */}
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Skeleton className="h-6 w-20 rounded-full" />
+                  <Skeleton className="h-6 w-20 rounded-full" />
+                </div>
+                <Skeleton className="w-5 h-5 rounded" />
+              </div>
+
+              {/* Event Info */}
+              <div className="mb-4">
+                <Skeleton className="h-6 w-full mb-2" />
+                <Skeleton className="h-6 w-3/4 mb-2" />
+                <Skeleton className="h-4 w-32 mb-3" />
+                <Skeleton className="h-4 w-full mb-1" />
+                <Skeleton className="h-4 w-5/6" />
+              </div>
+
+              {/* Event Details */}
+              <div className="space-y-2 mb-4">
+                <div className="flex items-center gap-2">
+                  <Skeleton className="w-4 h-4 rounded" />
+                  <Skeleton className="h-4 w-32" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Skeleton className="w-4 h-4 rounded" />
+                  <Skeleton className="h-4 w-24" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Skeleton className="h-6 w-20 rounded-full" />
+                  <Skeleton className="h-6 w-16 rounded-full" />
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="pt-4 border-t">
+                <Skeleton className="h-9 w-full rounded-full" />
+              </div>
+            </Card>
+          ))
         ) : events.length === 0 ? (
           <Card className="col-span-full p-12">
             <div className="text-center space-y-4">

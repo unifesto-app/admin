@@ -9,6 +9,7 @@ import Link from 'next/link';
 interface RedeemCode {
   id: string;
   code: string;
+  aliases: string[];
   type: 'promotional' | 'gift' | 'event' | 'partner';
   coin_amount: number;
   max_uses: number | null;
@@ -30,7 +31,6 @@ export default function RedeemCodesPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
 
-  // Create form state
   const [formData, setFormData] = useState({
     code: '',
     type: 'promotional',
@@ -262,6 +262,9 @@ export default function RedeemCodesPage() {
                     Code
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Alias
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Type
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -295,6 +298,15 @@ export default function RedeemCodesPage() {
                             {code.code}
                           </span>
                         </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="text-gray-600 text-sm">
+                          {code.aliases && code.aliases.length > 0
+                            ? (code.aliases.length > 1
+                              ? `${code.aliases[0]} +${code.aliases.length - 1} more`
+                              : code.aliases[0])
+                            : '-'}
+                        </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span

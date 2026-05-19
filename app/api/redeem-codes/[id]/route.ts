@@ -8,7 +8,7 @@ export async function GET(
   try {
     const { id } = await params;
     const supabase = await createClient();
-    
+
     // Check authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
@@ -45,7 +45,7 @@ export async function PATCH(
   try {
     const { id } = await params;
     const supabase = await createClient();
-    
+
     // Check authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
@@ -60,6 +60,13 @@ export async function PATCH(
     // Only update allowed fields
     if (body.is_active !== undefined) {
       updates.is_active = body.is_active;
+    }
+    if (body.aliases !== undefined) {
+      if (Array.isArray(body.aliases) && body.aliases.length <= 10) {
+        updates.aliases = body.aliases.map((a: string) => a.toUpperCase());
+      } else {
+        return NextResponse.json({ error: 'Aliases must be an array of up to 10 strings' }, { status: 400 });
+      }
     }
     if (body.max_uses !== undefined) {
       updates.max_uses = body.max_uses;
@@ -100,7 +107,7 @@ export async function DELETE(
   try {
     const { id } = await params;
     const supabase = await createClient();
-    
+
     // Check authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {

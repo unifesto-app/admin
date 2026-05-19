@@ -10,6 +10,7 @@ import Link from 'next/link';
 interface RedeemCode {
   id: string;
   code: string;
+  aliases: string[];
   type: 'promotional' | 'gift' | 'event' | 'partner';
   coin_amount: number;
   max_uses: number | null;
@@ -43,6 +44,10 @@ export default function RedeemCodeDetailPage() {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
 
+  const [isEditingAlias, setIsEditingAlias] = useState(false);
+  const [currentAliases, setCurrentAliases] = useState<string[]>([]);
+  const [newAliasInput, setNewAliasInput] = useState('');
+
   useEffect(() => {
     fetchCodeDetails();
   }, [id]);
@@ -68,6 +73,32 @@ export default function RedeemCodeDetailPage() {
       console.error('Error fetching code details:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleUpdateAliases = async () => {
+    if (!code) return;
+    try {
+      setUpdating(true);
+      const response = await fetch(`/api/redeem-codes/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ aliases: currentAliases }),
+      });
+
+      if (response.ok) {
+        setIsEditingAlias(false);
+        setNewAliasInput('');
+        fetchCodeDetails();
+      } else {
+        const data = await response.json();
+        alert(data.error || 'Failed to update aliases');
+      }
+    } catch (error) {
+      console.error('Error updating aliases:', error);
+      alert('Failed to update aliases');
+    } finally {
+      setUpdating(false);
     }
   };
 
@@ -198,8 +229,8 @@ export default function RedeemCodeDetailPage() {
               {updating
                 ? 'Updating...'
                 : code.is_active
-                ? 'Deactivate'
-                : 'Activate'}
+                  ? 'Deactivate'
+                  : 'Activate'}
             </Button>
           )}
           <Button
@@ -246,6 +277,99 @@ export default function RedeemCodeDetailPage() {
                 >
                   {code.type}
                 </span>
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between">
+                <label className="text-sm text-gray-600">Aliases (max 10)</label>
+                {!isEditingAlias && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-xs"
+                    onClick={() => {
+                      setCurrentAliases(code.aliases || []);
+                      setNewAliasInput('');
+                      setIsEditingAlias(true);
+                    }}
+                  >
+                    Edit
+                  </Button>
+                )}
+              </div>
+              <div className="mt-1">
+                {isEditingAlias ? (
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap gap-2">
+                      {currentAliases.map((alias, idx) => (
+                        <span key={idx} className="inline-flex items-center px-2 py-1 bg-purple-50 text-purple-700 border border-purple-200 rounded-md text-sm font-medium">
+                          {alias}
+                          <button
+                            onClick={() => setCurrentAliases(currentAliases.filter((_, i) => i !== idx))}
+                            className="ml-2 text-purple-400 hover:text-purple-600 focus:outline-none"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                    {currentAliases.length < 10 && (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={newAliasInput}
+                          onChange={(e) => setNewAliasInput(e.target.value.toUpperCase())}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && newAliasInput.trim()) {
+                              e.preventDefault();
+                              if (!currentAliases.includes(newAliasInput.trim())) {
+                                setCurrentAliases([...currentAliases, newAliasInput.trim()]);
+                              }
+                              setNewAliasInput('');
+                            }
+                          }}
+                          placeholder="Type and press Enter"
+                          className="flex-1 px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm font-mono"
+                          maxLength={30}
+                        />
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            if (newAliasInput.trim() && !currentAliases.includes(newAliasInput.trim())) {
+                              setCurrentAliases([...currentAliases, newAliasInput.trim()]);
+                              setNewAliasInput('');
+                            }
+                          }}
+                          className="h-8"
+                        >
+                          Add
+                        </Button>
+                      </div>
+                    )}
+                    <div className="flex gap-2 pt-2 border-t">
+                      <Button size="sm" onClick={handleUpdateAliases} disabled={updating} className="h-8">
+                        {updating ? 'Saving...' : 'Save Aliases'}
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setIsEditingAlias(false)} disabled={updating} className="h-8">
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {(code.aliases || []).length > 0 ? (
+                      code.aliases.map((alias, idx) => (
+                        <span key={idx} className="inline-flex items-center px-2.5 py-1 bg-gray-100 rounded-md text-sm font-medium font-mono text-gray-700">
+                          {alias}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-gray-400 italic">No aliases set</span>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 

@@ -69,7 +69,6 @@ interface Member {
     email: string;
     username: string | null;
     avatar_url: string | null;
-    role: string; // Unified platform role
   } | null;
 }
 
@@ -622,15 +621,10 @@ export default function OrganizationDetailPage() {
                         </div>
                       )}
                       <div>
-                        <div className="font-medium">{member.profile?.name || 'Unknown'}</div>
-                        <div className="text-sm text-muted-foreground">{member.profile?.email}</div>
+                        <div className="font-medium">{member.profile?.name || 'Unknown User'}</div>
+                        <div className="text-sm text-muted-foreground">{member.profile?.email || 'No email'}</div>
                         {member.profile?.username && (
                           <div className="text-sm text-muted-foreground">@{member.profile.username}</div>
-                        )}
-                        {member.profile?.role && (
-                          <div className="text-xs text-muted-foreground mt-1">
-                            Platform Role: {PLATFORM_ROLE_LABELS[member.profile.role] || member.profile.role}
-                          </div>
                         )}
                       </div>
                     </div>

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createServiceClient } from '@supabase/supabase-js';
 import { logSuccess, logFailure, getClientIp, getUserAgent } from '@/lib/audit/audit-logger';
+import { hasAdminRole } from '@/lib/auth/roles';
 
 // GET /api/users - List all users with pagination and filters
 export async function GET(request: NextRequest) {
@@ -22,22 +23,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check admin privileges
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (!profile || (profile.role !== 'admin' && profile.role !== 'super_admin')) {
-      await logFailure('view_users', 'users', 'Forbidden - insufficient privileges', {
-        userId: user.id,
-        ipAddress: getClientIp(request.headers),
-        userAgent: getUserAgent(request.headers),
-      });
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
-
     // Use service role client to bypass RLS
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -47,6 +32,33 @@ export async function GET(request: NextRequest) {
         autoRefreshToken: false,
       },
     });
+
+    // Check admin privileges using admin client
+    const { data: profile, error: profileError } = await adminClient
+      .from('profiles_with_roles')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError) {
+      console.error('Error fetching profile with admin client:', profileError);
+      await logFailure('view_users', 'users', `Profile fetch error: ${profileError.message}`, {
+        userId: user.id,
+        ipAddress: getClientIp(request.headers),
+        userAgent: getUserAgent(request.headers),
+      });
+      return NextResponse.json({ error: 'Profile not found' }, { status: 403 });
+    }
+
+    if (!profile || !hasAdminRole(profile.roles || profile.role)) {
+      console.log('Access denied - user roles:', profile?.roles, 'primary role:', profile?.role, 'user id:', user.id);
+      await logFailure('view_users', 'users', 'Forbidden - insufficient privileges', {
+        userId: user.id,
+        ipAddress: getClientIp(request.headers),
+        userAgent: getUserAgent(request.headers),
+      });
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
 
     // Get query parameters
     const searchParams = request.nextUrl.searchParams;
@@ -152,12 +164,12 @@ export async function POST(request: NextRequest) {
 
     // Check admin privileges
     const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
+      .from('profiles_with_roles')
+      .select('role, roles')
       .eq('id', user.id)
       .single();
 
-    if (!profile || (profile.role !== 'admin' && profile.role !== 'super_admin')) {
+    if (!profile || !hasAdminRole(profile.roles || profile.role)) {
       await logFailure('create_user', 'users', 'Forbidden - insufficient privileges', {
         userId: user.id,
         ipAddress: getClientIp(request.headers),

@@ -129,7 +129,31 @@ export default function UsersPage() {
     fetchUsers();
   };
 
-  const getRoleLabel = (role: string) => {
+  const getRoleLabel = (role: string | string[] | undefined) => {
+    // Handle array of roles (new system)
+    if (Array.isArray(role)) {
+      // Get the first (highest priority) role
+      const primaryRole = role[0];
+      if (!primaryRole) return 'No Role';
+      
+      // Map role codes to labels
+      const roleCodeMap: Record<string, string> = {
+        'SUPER_ADMIN': 'Super Admin',
+        'PLATFORM_ADMIN': 'Platform Admin',
+        'ORG_SUPER_ADMIN': 'Org Super Admin',
+        'ORG_ADMIN': 'Org Admin',
+        'ORGANISER': 'Organizer',
+        'EVENT_ORGANIZER': 'Event Organizer',
+        'ATTENDEE': 'Attendee',
+        'USER': 'User',
+      };
+      
+      return roleCodeMap[primaryRole] || primaryRole.replace(/_/g, ' ');
+    }
+    
+    // Handle single role string (backward compatibility)
+    if (!role) return 'No Role';
+    
     switch (role) {
       case 'super_admin':
         return 'Super Admin';
@@ -142,23 +166,38 @@ export default function UsersPage() {
       case 'attendee':
         return 'Attendee';
       default:
-        return role.replace('_', ' ');
+        return role.replace(/_/g, ' ');
     }
   };
 
-  const getRoleBadgeColor = (role: string) => {
-    switch (role) {
-      case 'super_admin':
-        return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200';
-      case 'org_super_admin':
-        return 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200';
-      case 'org_admin':
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
-      case 'organizer':
-        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
-      default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200';
+  const getRoleBadgeColor = (role: string | string[] | undefined) => {
+    // Get the primary role for color determination
+    let primaryRole = role;
+    if (Array.isArray(role)) {
+      primaryRole = role[0];
     }
+    
+    if (!primaryRole) {
+      return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200';
+    }
+    
+    // Handle both old format (super_admin) and new format (SUPER_ADMIN)
+    const roleStr = String(primaryRole).toLowerCase();
+    
+    if (roleStr === 'super_admin' || roleStr === 'platform_admin') {
+      return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200';
+    }
+    if (roleStr === 'org_super_admin' || roleStr === 'org_owner') {
+      return 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200';
+    }
+    if (roleStr === 'org_admin') {
+      return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
+    }
+    if (roleStr === 'organizer' || roleStr === 'organiser' || roleStr === 'event_organizer') {
+      return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+    }
+    
+    return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200';
   };
 
   const getStatusBadgeColor = (user: Profile) => {

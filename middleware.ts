@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 
-const ADMIN_ROLES = new Set(['super_admin']);
+const ADMIN_ROLES = new Set(['org_admin', 'org_super_admin', 'super_admin']);
 const DEFAULT_ADMIN_EMAIL = 'unifestoapp@gmail.com';
 const LOGIN_RATE_LIMIT_WINDOW_MS = 60_000;
 const LOGIN_RATE_LIMIT_MAX_REQUESTS = 40;
@@ -175,7 +175,7 @@ export async function middleware(request: NextRequest) {
       });
 
       const { data: byId } = await adminClient
-        .from('profiles')
+        .from('profiles_with_roles')
         .select('role,is_active,is_banned')
         .eq('id', user.id)
         .maybeSingle();
@@ -184,7 +184,7 @@ export async function middleware(request: NextRequest) {
 
       if (!profileById?.role && user.email) {
         const { data: byEmail } = await adminClient
-          .from('profiles')
+          .from('profiles_with_roles')
           .select('role,is_active,is_banned')
           .ilike('email', user.email)
           .maybeSingle();
@@ -193,7 +193,7 @@ export async function middleware(request: NextRequest) {
       }
     } else {
       const { data: byId } = await supabase
-        .from('profiles')
+        .from('profiles_with_roles')
         .select('role,is_active,is_banned')
         .eq('id', user.id)
         .maybeSingle();
@@ -202,7 +202,7 @@ export async function middleware(request: NextRequest) {
 
       if (!profileById?.role && user.email) {
         const { data: byEmail } = await supabase
-          .from('profiles')
+          .from('profiles_with_roles')
           .select('role,is_active,is_banned')
           .ilike('email', user.email)
           .maybeSingle();

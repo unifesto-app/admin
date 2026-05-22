@@ -22,27 +22,59 @@ import {
   Gift,
   Activity,
   Tag,
+  Smartphone,
 } from 'lucide-react';
 
-const navItems = [
-  { href: '/dashboard', label: 'Overview', icon: LayoutDashboard },
-  { href: '/dashboard/users', label: 'Users', icon: Users },
-  { href: '/dashboard/wallet', label: 'Wallet', icon: Wallet },
-  { href: '/dashboard/referrals', label: 'Referrals', icon: Gift },
-  { href: '/dashboard/redeem-codes', label: 'Redeem Codes', icon: Tag },
-  { href: '/dashboard/organizations', label: 'Organizations', icon: Building2 },
-  { href: '/dashboard/events', label: 'Events', icon: Calendar },
-  { href: '/dashboard/transactions', label: 'Transactions', icon: CreditCard },
-  { href: '/dashboard/payouts', label: 'Payouts', icon: DollarSign },
-  { href: '/dashboard/analytics', label: 'Analytics', icon: BarChart3 },
-  { href: '/dashboard/announcements', label: 'Announcements', icon: Megaphone },
-  { href: '/dashboard/categories', label: 'Categories', icon: FolderOpen },
-  { href: '/dashboard/careers', label: 'Careers', icon: Briefcase },
-  { href: '/dashboard/media', label: 'Media', icon: FileText },
-  { href: '/dashboard/api-keys', label: 'API Keys', icon: Key },
-  { href: '/dashboard/roles', label: 'Roles', icon: Shield },
-  { href: '/dashboard/audit', label: 'Audit Logs', icon: Activity },
-  { href: '/dashboard/settings', label: 'Settings', icon: Settings },
+const navSections = [
+  {
+    title: 'Overview',
+    items: [
+      { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    ],
+  },
+  {
+    title: 'User Management',
+    items: [
+      { href: '/dashboard/users', label: 'Users', icon: Users },
+      { href: '/dashboard/organizations', label: 'Organizations', icon: Building2 },
+      { href: '/dashboard/roles', label: 'Roles', icon: Shield },
+    ],
+  },
+  {
+    title: 'Financial',
+    items: [
+      { href: '/dashboard/wallet', label: 'Wallet', icon: Wallet },
+      { href: '/dashboard/transactions', label: 'Transactions', icon: CreditCard },
+      { href: '/dashboard/payouts', label: 'Payouts', icon: DollarSign },
+      { href: '/dashboard/referrals', label: 'Referrals', icon: Gift },
+      { href: '/dashboard/redeem-codes', label: 'Redeem Codes', icon: Tag },
+    ],
+  },
+  {
+    title: 'Content',
+    items: [
+      { href: '/dashboard/events', label: 'Events', icon: Calendar },
+      { href: '/dashboard/announcements', label: 'Announcements', icon: Megaphone },
+      { href: '/dashboard/categories', label: 'Categories', icon: FolderOpen },
+      { href: '/dashboard/careers', label: 'Careers', icon: Briefcase },
+      { href: '/dashboard/media', label: 'Media', icon: FileText },
+    ],
+  },
+  {
+    title: 'Analytics',
+    items: [
+      { href: '/dashboard/analytics', label: 'Web Analytics', icon: BarChart3 },
+      { href: '/dashboard/app-analytics', label: 'App Analytics', icon: Smartphone },
+      { href: '/dashboard/audit', label: 'Audit Logs', icon: Activity },
+    ],
+  },
+  {
+    title: 'System',
+    items: [
+      { href: '/dashboard/api-keys', label: 'API Keys', icon: Key },
+      { href: '/dashboard/settings', label: 'Settings', icon: Settings },
+    ],
+  },
 ];
 
 export default function DashboardNav() {
@@ -50,27 +82,36 @@ export default function DashboardNav() {
 
   return (
     <nav className="hidden lg:block w-64 border-r bg-muted/10 h-full overflow-y-auto">
-      <div className="space-y-1 p-4">
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = pathname === item.href;
+      <div className="space-y-6 p-4">
+        {navSections.map((section) => (
+          <div key={section.title}>
+            <h3 className="mb-2 px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              {section.title}
+            </h3>
+            <div className="space-y-1">
+              {section.items.map((item) => {
+                const Icon = item.icon;
+                const isActive = pathname === item.href;
 
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-                isActive
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-              )}
-            >
-              <Icon className="h-4 w-4" />
-              {item.label}
-            </Link>
-          );
-        })}
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={cn(
+                      'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                      isActive
+                        ? 'bg-primary text-primary-foreground'
+                        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                    )}
+                  >
+                    <Icon className="h-4 w-4" />
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </div>
     </nav>
   );

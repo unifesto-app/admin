@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createServiceClient } from '@supabase/supabase-js';
 import { logSuccess, logFailure, getClientIp, getUserAgent } from '@/lib/audit/audit-logger';
+import { isAdminRole } from '@/lib/auth/role-utils';
 
 // GET /api/organizations/[id]/members - Get organization members
 export async function GET(
@@ -31,13 +32,8 @@ export async function GET(
     }
 
     // Check admin privileges
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (!profile || (profile.role !== 'admin' && profile.role !== 'super_admin')) {
+    const hasAdminAccess = await isAdminRole(user.id);
+    if (!hasAdminAccess) {
       await logFailure('view_organization_members', 'organization_members', 'Forbidden - insufficient privileges', {
         userId: user.id,
         resourceId: orgId,
@@ -86,12 +82,12 @@ export async function GET(
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    // Fetch profile data for each member including platform role
+    // Fetch profile data for each member (no role in profiles table)
     const enrichedMembers = await Promise.all(
       (members || []).map(async (member) => {
         const { data: profileData } = await adminClient
           .from('profiles')
-          .select('id, name, email, username, avatar_url, role')
+          .select('id, name, email, username, avatar_url')
           .eq('id', member.user_id)
           .single();
 
@@ -150,13 +146,8 @@ export async function POST(
     }
 
     // Check admin privileges
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (!profile || (profile.role !== 'admin' && profile.role !== 'super_admin')) {
+    const hasAdminAccess = await isAdminRole(user.id);
+    if (!hasAdminAccess) {
       await logFailure('add_organization_member', 'organization_members', 'Forbidden - insufficient privileges', {
         userId: user.id,
         resourceId: orgId,
@@ -324,13 +315,8 @@ export async function PATCH(
     }
 
     // Check admin privileges
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (!profile || (profile.role !== 'admin' && profile.role !== 'super_admin')) {
+    const hasAdminAccess = await isAdminRole(user.id);
+    if (!hasAdminAccess) {
       await logFailure('update_organization_member', 'organization_members', 'Forbidden - insufficient privileges', {
         userId: user.id,
         resourceId: orgId,
@@ -459,13 +445,8 @@ export async function DELETE(
     }
 
     // Check admin privileges
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (!profile || (profile.role !== 'admin' && profile.role !== 'super_admin')) {
+    const hasAdminAccess = await isAdminRole(user.id);
+    if (!hasAdminAccess) {
       await logFailure('remove_organization_member', 'organization_members', 'Forbidden - insufficient privileges', {
         userId: user.id,
         resourceId: orgId,

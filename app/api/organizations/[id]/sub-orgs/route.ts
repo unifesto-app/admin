@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createServiceClient } from '@supabase/supabase-js';
 import { logSuccess, logFailure, getClientIp, getUserAgent } from '@/lib/audit/audit-logger';
+import { isAdminRole } from '@/lib/auth/role-utils';
 
 // GET /api/organizations/[id]/sub-orgs - Get sub-organizations
 export async function GET(
@@ -31,13 +32,8 @@ export async function GET(
     }
 
     // Check admin privileges
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (!profile || (profile.role !== 'admin' && profile.role !== 'super_admin')) {
+    const hasAdminAccess = await isAdminRole(user.id);
+    if (!hasAdminAccess) {
       await logFailure('view_sub_organizations', 'organizations', 'Forbidden - insufficient privileges', {
         userId: user.id,
         resourceId: orgId,

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createServiceClient } from '@supabase/supabase-js';
 import { logSuccess, logFailure, getClientIp, getUserAgent } from '@/lib/audit/audit-logger';
+import { isAdminRole as checkIsAdminRole, isSuperAdminRole } from '@/lib/auth/role-utils';
 
 // GET /api/organizations/[id] - Get organization details
 export async function GET(
@@ -30,23 +31,6 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check admin privileges
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (!profile || (profile.role !== 'admin' && profile.role !== 'super_admin')) {
-      await logFailure('view_organization', 'organizations', 'Forbidden - insufficient privileges', {
-        userId: user.id,
-        resourceId: orgId,
-        ipAddress: getClientIp(request.headers),
-        userAgent: getUserAgent(request.headers),
-      });
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
-
     // Use service role client to bypass RLS
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -57,6 +41,19 @@ export async function GET(
         autoRefreshToken: false,
       },
     });
+
+    // Check admin privileges
+    const hasAdminAccess = await checkIsAdminRole(user.id);
+
+    if (!hasAdminAccess) {
+      await logFailure('view_organization', 'organizations', 'Forbidden - insufficient privileges', {
+        userId: user.id,
+        resourceId: orgId,
+        ipAddress: getClientIp(request.headers),
+        userAgent: getUserAgent(request.headers),
+      });
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
 
     // Get organization
     const { data: organization, error } = await adminClient
@@ -157,13 +154,8 @@ export async function PATCH(
     }
 
     // Check admin privileges
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (!profile || (profile.role !== 'admin' && profile.role !== 'super_admin')) {
+    const hasAdminAccess = await checkIsAdminRole(user.id);
+    if (!hasAdminAccess) {
       await logFailure('update_organization', 'organizations', 'Forbidden - insufficient privileges', {
         userId: user.id,
         resourceId: orgId,
@@ -335,13 +327,8 @@ export async function DELETE(
     }
 
     // Check admin privileges (only super_admin can delete)
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (!profile || profile.role !== 'super_admin') {
+    const hasSuperAdminAccess = await isSuperAdminRole(user.id);
+    if (!hasSuperAdminAccess) {
       await logFailure('delete_organization', 'organizations', 'Forbidden - super admin required', {
         userId: user.id,
         resourceId: orgId,

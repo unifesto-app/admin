@@ -7,6 +7,7 @@ export type Json =
   | Json[];
 
 export type PlatformRole = 'attendee' | 'organizer' | 'org_admin' | 'org_super_admin' | 'super_admin';
+export type RoleCode = 'USER' | 'ORG_ORGANIZER' | 'EVENT_ORGANIZER' | 'ORG_ADMIN' | 'ORG_OWNER' | 'PLATFORM_ADMIN' | 'SUPER_ADMIN' | 'EVENT_CHECKIN_STAFF' | 'EVENT_VOLUNTEER' | 'EVENT_COLLABORATOR' | 'ORG_MEMBER' | 'MODERATOR';
 
 export interface Profile {
   id: string;
@@ -16,7 +17,10 @@ export interface Profile {
   bio: string | null;
   email: string | null;
   phone: string | null;
-  role: PlatformRole;
+  role: PlatformRole | string; // Primary role for backward compatibility
+  roles?: RoleCode[]; // Array of all roles (new multi-role system)
+  role_names?: string[]; // Array of role names (human readable)
+  role_count?: number; // Number of active roles
   is_verified: boolean;
   preferences: Json;
   is_active: boolean;

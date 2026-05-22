@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createServiceClient } from '@supabase/supabase-js';
+import { isAdminRole } from '@/lib/auth/role-utils';
 
 // GET /api/organizations/test - Test endpoint to verify service role access
 export async function GET(request: NextRequest) {
@@ -18,13 +19,8 @@ export async function GET(request: NextRequest) {
     }
 
     // Check admin privileges
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (!profile || (profile.role !== 'admin' && profile.role !== 'super_admin')) {
+    const hasAdminAccess = await isAdminRole(user.id);
+    if (!hasAdminAccess) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -95,7 +91,7 @@ export async function GET(request: NextRequest) {
       },
       userInfo: {
         userId: user.id,
-        userRole: profile.role,
+        hasAdminAccess: true, // User has admin access since they passed the check
       },
     });
   } catch (error: any) {

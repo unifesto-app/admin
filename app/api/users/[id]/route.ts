@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createServiceClient } from '@supabase/supabase-js';
+import { isAdminRole as checkIsAdminRole, isSuperAdminRole as checkIsSuperAdminRole } from '@/lib/auth/role-utils';
 
 // GET /api/users/[id] - Get a single user by ID
 export async function GET(
@@ -21,13 +22,8 @@ export async function GET(
     }
 
     // Check admin privileges
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (!profile || (profile.role !== 'admin' && profile.role !== 'super_admin')) {
+    const hasAdminAccess = await checkIsAdminRole(user.id);
+    if (!hasAdminAccess) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -87,13 +83,8 @@ export async function PATCH(
     }
 
     // Check admin privileges
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (!profile || (profile.role !== 'admin' && profile.role !== 'super_admin')) {
+    const hasAdminAccess = await checkIsAdminRole(user.id);
+    if (!hasAdminAccess) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -189,13 +180,8 @@ export async function DELETE(
     }
 
     // Check admin privileges (only super_admin can delete users)
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (!profile || profile.role !== 'super_admin') {
+    const hasSuperAdminAccess = await checkIsSuperAdminRole(user.id);
+    if (!hasSuperAdminAccess) {
       return NextResponse.json(
         { error: 'Forbidden - Only super admins can delete users' },
         { status: 403 }

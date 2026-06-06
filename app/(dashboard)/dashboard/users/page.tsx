@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Plus, UserCheck, UserX, Ban } from 'lucide-react';
+import { Search, UserCheck, UserX, Ban } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { getUsers, deleteUser, activateUsers, deactivateUsers, banUsers } from '@/lib/api/users';
@@ -40,15 +40,33 @@ export default function UsersPage() {
         page: currentPage,
         limit,
         search: searchTerm,
-        role: roleFilter as any,
-        is_active: statusFilter === 'active' ? true : statusFilter === 'inactive' ? false : undefined,
-        is_banned: statusFilter === 'banned' ? true : undefined,
-        sortBy: 'created_at',
-        sortOrder: 'desc',
       };
 
       const response = await getUsers(params);
-      setUsers(response.users);
+      
+      // Transform backend response to match Profile interface
+      const transformedUsers = response.users.map((user: any) => ({
+        id: user.id,
+        name: user.fullName,
+        username: user.username,
+        avatar_url: user.avatarUrl,
+        bio: user.bio,
+        email: user.email,
+        phone: user.mobileNumber,
+        role: user.roles && user.roles.length > 0 ? user.roles[0] : 'USER',
+        roles: user.roles || [],
+        is_verified: user.emailVerified || user.mobileVerified,
+        preferences: {},
+        is_active: true, // Backend doesn't have this field yet, default to true
+        is_banned: false, // Backend doesn't have this field yet, default to false
+        ban_reason: null,
+        last_login: null,
+        created_at: user.createdAt,
+        updated_at: user.updatedAt,
+        wallet_passcode: null,
+      }));
+      
+      setUsers(transformedUsers);
       setTotalPages(response.pagination.totalPages);
       setTotal(response.pagination.total);
     } catch (err) {
@@ -120,11 +138,6 @@ export default function UsersPage() {
     router.push(`/dashboard/users/${userId}`);
   };
 
-  const handleAddUser = () => {
-    setEditingUser(null);
-    setShowFormModal(true);
-  };
-
   const handleFormSuccess = () => {
     fetchUsers();
   };
@@ -136,13 +149,17 @@ export default function UsersPage() {
       const primaryRole = role[0];
       if (!primaryRole) return 'No Role';
       
-      // Map role codes to labels
+      // Map role codes to labels (updated for new system)
       const roleCodeMap: Record<string, string> = {
+        'ADMIN': 'Admin',
+        'SUPER_ORGANISER': 'Super Organiser',
+        'ORGANISER': 'Organiser',
+        'CO_ORGANISER': 'Co-Organiser',
+        'MEMBER': 'Member',
         'SUPER_ADMIN': 'Super Admin',
         'PLATFORM_ADMIN': 'Platform Admin',
         'ORG_SUPER_ADMIN': 'Org Super Admin',
         'ORG_ADMIN': 'Org Admin',
-        'ORGANISER': 'Organizer',
         'EVENT_ORGANIZER': 'Event Organizer',
         'ATTENDEE': 'Attendee',
         'USER': 'User',
@@ -151,23 +168,24 @@ export default function UsersPage() {
       return roleCodeMap[primaryRole] || primaryRole.replace(/_/g, ' ');
     }
     
-    // Handle single role string (backward compatibility)
+    // Handle single role string
     if (!role) return 'No Role';
     
-    switch (role) {
-      case 'super_admin':
-        return 'Super Admin';
-      case 'org_super_admin':
-        return 'Org Super Admin';
-      case 'org_admin':
-        return 'Org Admin';
-      case 'organizer':
-        return 'Organizer';
-      case 'attendee':
-        return 'Attendee';
-      default:
-        return role.replace(/_/g, ' ');
-    }
+    // Check if it's already a mapped value
+    const roleCodeMap: Record<string, string> = {
+      'ADMIN': 'Admin',
+      'SUPER_ORGANISER': 'Super Organiser',
+      'ORGANISER': 'Organiser',
+      'CO_ORGANISER': 'Co-Organiser',
+      'MEMBER': 'Member',
+      'super_admin': 'Super Admin',
+      'org_super_admin': 'Org Super Admin',
+      'org_admin': 'Org Admin',
+      'organizer': 'Organizer',
+      'attendee': 'Attendee',
+    };
+    
+    return roleCodeMap[role] || role.replace(/_/g, ' ');
   };
 
   const getRoleBadgeColor = (role: string | string[] | undefined) => {
@@ -181,20 +199,23 @@ export default function UsersPage() {
       return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200';
     }
     
-    // Handle both old format (super_admin) and new format (SUPER_ADMIN)
+    // Handle both old format (super_admin) and new format (ADMIN, SUPER_ORGANISER, etc.)
     const roleStr = String(primaryRole).toLowerCase();
     
-    if (roleStr === 'super_admin' || roleStr === 'platform_admin') {
+    if (roleStr === 'admin' || roleStr === 'super_admin' || roleStr === 'platform_admin') {
       return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200';
     }
-    if (roleStr === 'org_super_admin' || roleStr === 'org_owner') {
+    if (roleStr === 'super_organiser' || roleStr === 'org_super_admin' || roleStr === 'org_owner') {
       return 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200';
     }
     if (roleStr === 'org_admin') {
       return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
     }
-    if (roleStr === 'organizer' || roleStr === 'organiser' || roleStr === 'event_organizer') {
+    if (roleStr === 'organizer' || roleStr === 'organiser' || roleStr === 'co_organiser' || roleStr === 'event_organizer') {
       return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+    }
+    if (roleStr === 'member' || roleStr === 'user') {
+      return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200';
     }
     
     return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200';
@@ -226,10 +247,7 @@ export default function UsersPage() {
             Manage user accounts and permissions
           </p>
         </div>
-        <Button onClick={handleAddUser}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add User
-        </Button>
+        {/* Add User button removed - users register via mobile app */}
       </div>
 
       {/* Stats Cards */}

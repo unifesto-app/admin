@@ -1,292 +1,76 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-import { createClient as createServiceClient } from '@supabase/supabase-js';
-import { logSuccess, logFailure, getClientIp, getUserAgent } from '@/lib/audit/audit-logger';
-import { hasAdminRole } from '@/lib/auth/roles';
+import { cookies } from 'next/headers';
 
-// GET /api/users - List all users with pagination and filters
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
+
+/**
+ * API Route: GET /api/users
+ * Fetch all users with pagination (proxies to backend with ADMIN role check)
+ */
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    // Get auth token from cookies
+    const cookieStore = await cookies();
+    const token = cookieStore.get('unifesto_admin_token')?.value;
 
-    // Check authentication
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      await logFailure('view_users', 'users', 'Unauthorized access attempt', {
-        ipAddress: getClientIp(request.headers),
-        userAgent: getUserAgent(request.headers),
-      });
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Use service role client to bypass RLS
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-    const adminClient = createServiceClient(supabaseUrl, serviceRoleKey, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-      },
-    });
-
-    // Check admin privileges using admin client
-    const { data: profile, error: profileError } = await adminClient
-      .from('profiles_with_roles')
-      .select('*')
-      .eq('id', user.id)
-      .single();
-
-    if (profileError) {
-      console.error('Error fetching profile with admin client:', profileError);
-      await logFailure('view_users', 'users', `Profile fetch error: ${profileError.message}`, {
-        userId: user.id,
-        ipAddress: getClientIp(request.headers),
-        userAgent: getUserAgent(request.headers),
-      });
-      return NextResponse.json({ error: 'Profile not found' }, { status: 403 });
-    }
-
-    if (!profile || !hasAdminRole(profile.roles || profile.role)) {
-      console.log('Access denied - user roles:', profile?.roles, 'primary role:', profile?.role, 'user id:', user.id);
-      await logFailure('view_users', 'users', 'Forbidden - insufficient privileges', {
-        userId: user.id,
-        ipAddress: getClientIp(request.headers),
-        userAgent: getUserAgent(request.headers),
-      });
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
-
-    // Get query parameters
-    const searchParams = request.nextUrl.searchParams;
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '10');
-    const search = searchParams.get('search') || '';
-    const role = searchParams.get('role') || '';
-    const isActive = searchParams.get('is_active');
-    const isBanned = searchParams.get('is_banned');
-    const isVerified = searchParams.get('is_verified');
-    const sortBy = searchParams.get('sortBy') || 'created_at';
-    const sortOrder = searchParams.get('sortOrder') || 'desc';
-
-    const from = (page - 1) * limit;
-    const to = from + limit - 1;
-
-    // Build query using admin client to bypass RLS
-    let query = adminClient
-      .from('profiles')
-      .select('*', { count: 'exact' });
-
-    // Apply filters
-    if (search) {
-      query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%,username.ilike.%${search}%`);
-    }
-
-    if (role) {
-      query = query.eq('role', role);
-    }
-
-    if (isActive !== null && isActive !== undefined) {
-      query = query.eq('is_active', isActive === 'true');
-    }
-
-    if (isBanned !== null && isBanned !== undefined) {
-      query = query.eq('is_banned', isBanned === 'true');
-    }
-
-    if (isVerified !== null && isVerified !== undefined) {
-      query = query.eq('is_verified', isVerified === 'true');
-    }
-
-    // Apply sorting and pagination
-    query = query
-      .order(sortBy, { ascending: sortOrder === 'asc' })
-      .range(from, to);
-
-    const { data: users, error, count } = await query;
-
-    if (error) {
-      console.error('Error fetching users:', error);
-      await logFailure('view_users', 'users', error.message, {
-        userId: user.id,
-        ipAddress: getClientIp(request.headers),
-        userAgent: getUserAgent(request.headers),
-      });
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    await logSuccess('view_users', 'users', {
-      userId: user.id,
-      details: { count: users?.length || 0, filters: { search, role, isActive, isBanned, isVerified } },
-      ipAddress: getClientIp(request.headers),
-      userAgent: getUserAgent(request.headers),
-    });
-
-    return NextResponse.json({
-      users,
-      pagination: {
-        page,
-        limit,
-        total: count || 0,
-        totalPages: Math.ceil((count || 0) / limit),
-      },
-    });
-  } catch (error) {
-    console.error('Unexpected error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
-  }
-}
-
-// POST /api/users - Create a new user
-export async function POST(request: NextRequest) {
-  try {
-    const supabase = await createClient();
-
-    // Check authentication
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      await logFailure('create_user', 'users', 'Unauthorized access attempt', {
-        ipAddress: getClientIp(request.headers),
-        userAgent: getUserAgent(request.headers),
-      });
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Check admin privileges
-    const { data: profile } = await supabase
-      .from('profiles_with_roles')
-      .select('role, roles')
-      .eq('id', user.id)
-      .single();
-
-    if (!profile || !hasAdminRole(profile.roles || profile.role)) {
-      await logFailure('create_user', 'users', 'Forbidden - insufficient privileges', {
-        userId: user.id,
-        ipAddress: getClientIp(request.headers),
-        userAgent: getUserAgent(request.headers),
-      });
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
-
-    // Use service role client to bypass RLS
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-    const adminClient = createServiceClient(supabaseUrl, serviceRoleKey, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-      },
-    });
-
-    const body = await request.json();
-    const { email, password, name, username, phone, role, is_active } = body;
-
-    // Validate required fields
-    if (!email || !password) {
-      await logFailure('create_user', 'users', 'Missing required fields', {
-        userId: user.id,
-        ipAddress: getClientIp(request.headers),
-        userAgent: getUserAgent(request.headers),
-      });
+    if (!token) {
       return NextResponse.json(
-        { error: 'Email and password are required' },
-        { status: 400 }
+        { error: 'Unauthorized - No authentication token' },
+        { status: 401 }
       );
     }
 
-    console.log('Creating user with role:', role || 'attendee');
+    // Get query parameters
+    const { searchParams } = request.nextUrl;
+    const page = searchParams.get('page') || '1';
+    const limit = searchParams.get('limit') || '10';
+    const search = searchParams.get('search') || '';
 
-    // Create user in Supabase Auth using admin client
-    const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: {
-        name: name || null,
-        username: username || null,
+    // Build backend URL with query params
+    const backendUrl = new URL(`${BACKEND_URL}/users`);
+    backendUrl.searchParams.set('page', page);
+    backendUrl.searchParams.set('limit', limit);
+    if (search) {
+      backendUrl.searchParams.set('search', search);
+    }
+
+    // Forward request to backend
+    const response = await fetch(backendUrl.toString(), {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
       },
     });
 
-    if (createError) {
-      console.error('Error creating user in Supabase Auth:', createError);
-      console.error('This error usually means the database constraint needs to be updated.');
-      console.error('Please run: ALTER TABLE profiles DROP CONSTRAINT IF EXISTS profiles_role_check;');
-      console.error('Then run: ALTER TABLE profiles ADD CONSTRAINT profiles_role_check CHECK (role IN (\'attendee\', \'organizer\', \'admin\', \'super_admin\', \'support\'));');
-      
-      await logFailure('create_user', 'users', createError.message, {
-        userId: user.id,
-        details: { email, name, username, error: createError, requestedRole: role },
-        ipAddress: getClientIp(request.headers),
-        userAgent: getUserAgent(request.headers),
-      });
-      return NextResponse.json({ 
-        error: `Auth error: ${createError.message}. The database constraint needs to be updated. Please run the SQL migration in QUICK_FIX_USER_ROLES.sql` 
-      }, { status: 400 });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      return NextResponse.json(
+        { error: errorData.message || 'Failed to fetch users from backend' },
+        { status: response.status }
+      );
     }
 
-    console.log('User created successfully in Auth, now updating profile...');
+    const data = await response.json();
+    return NextResponse.json(data);
 
-    // Update profile with additional fields using admin client
-    const { data: updatedProfile, error: updateError } = await adminClient
-      .from('profiles')
-      .update({
-        name: name || null,
-        username: username || null,
-        email: email,
-        phone: phone || null,
-        role: role || 'attendee',
-        is_active: is_active !== undefined ? is_active : true,
-      })
-      .eq('id', newUser.user.id)
-      .select()
-      .single();
-
-    if (updateError) {
-      console.error('Error updating profile:', updateError);
-      console.error('Profile update details:', { 
-        userId: newUser.user.id, 
-        role: role || 'attendee',
-        updateError 
-      });
-      await logFailure('create_user', 'users', updateError.message, {
-        userId: user.id,
-        resourceId: newUser.user.id,
-        details: { error: updateError, role: role || 'attendee' },
-        ipAddress: getClientIp(request.headers),
-        userAgent: getUserAgent(request.headers),
-      });
-      return NextResponse.json({ 
-        error: `Profile update error: ${updateError.message}. ${updateError.hint || ''}` 
-      }, { status: 500 });
-    }
-
-    await logSuccess('create_user', 'users', {
-      userId: user.id,
-      resourceId: newUser.user.id,
-      details: { email, name, username, role: role || 'attendee' },
-      ipAddress: getClientIp(request.headers),
-      userAgent: getUserAgent(request.headers),
-    });
-
-    return NextResponse.json(
-      { user: updatedProfile, message: 'User created successfully' },
-      { status: 201 }
-    );
   } catch (error) {
-    console.error('Unexpected error:', error);
+    console.error('Error fetching users:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
     );
   }
 }
+
+/**
+ * API Route: POST /api/users
+ * Create a new user
+ */
+export async function POST(request: NextRequest) {
+  return NextResponse.json(
+    { error: 'Not implemented - Supabase removed, replace with backend API' },
+    { status: 501 }
+  );
+}
+

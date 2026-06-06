@@ -1,124 +1,95 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-import { createClient as createServiceClient } from '@supabase/supabase-js';
-import { logSuccess, logFailure, getClientIp, getUserAgent } from '@/lib/audit/audit-logger';
-import { isAdminRole as checkIsAdminRole } from '@/lib/auth/role-utils';
+import { cookies } from 'next/headers';
 
-// GET /api/roles - List all roles
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
+
+/**
+ * API Route: GET /api/roles
+ * Fetch all available roles
+ */
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    const cookieStore = await cookies();
+    const token = cookieStore.get('unifesto_admin_token')?.value;
 
-    // Check authentication
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Unauthorized - No authentication token' },
+        { status: 401 }
+      );
     }
 
-    // Use service role client to bypass RLS if needed
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-    const adminClient = createServiceClient(supabaseUrl, serviceRoleKey, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
+    const response = await fetch(`${BACKEND_URL}/roles`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
       },
     });
 
-    // Check admin privileges
-    const hasAdminAccess = await checkIsAdminRole(user.id);
-
-    if (!hasAdminAccess) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      return NextResponse.json(
+        { error: errorData.message || 'Failed to fetch roles' },
+        { status: response.status }
+      );
     }
 
-    const { data: roles, error } = await adminClient
-      .from('access_roles')
-      .select('*')
-      .is('deleted_at', null)
-      .order('name');
+    const data = await response.json();
+    return NextResponse.json(data);
 
-    if (error) {
-      console.error('Error fetching roles:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    return NextResponse.json({ roles });
-  } catch (error: any) {
-    console.error('Unexpected error in GET /api/roles:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+  } catch (error) {
+    console.error('Error fetching roles:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }
 }
 
-// POST /api/roles - Create a new role
+/**
+ * API Route: POST /api/roles
+ * Assign a role to a user
+ */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    const cookieStore = await cookies();
+    const token = cookieStore.get('unifesto_admin_token')?.value;
 
-    // Check authentication
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Check admin privileges
-    const hasAdminAccess = await checkIsAdminRole(user.id);
-    if (!hasAdminAccess) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Unauthorized - No authentication token' },
+        { status: 401 }
+      );
     }
 
     const body = await request.json();
-    const { name, code, scope, description } = body;
 
-    if (!name || !code || !scope) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
-    }
-
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-    const adminClient = createServiceClient(supabaseUrl, serviceRoleKey, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
+    const response = await fetch(`${BACKEND_URL}/roles/assign`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
       },
+      body: JSON.stringify(body),
     });
 
-    const { data: role, error } = await adminClient
-      .from('access_roles')
-      .insert({
-        name,
-        code,
-        scope,
-        description,
-        is_system: false
-      })
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error creating role:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      return NextResponse.json(
+        { error: errorData.message || 'Failed to assign role' },
+        { status: response.status }
+      );
     }
 
-    await logSuccess('create_role', 'access_roles', {
-      resourceId: role.id,
-      userId: user.id,
-      details: { name, code },
-      ipAddress: getClientIp(request.headers),
-      userAgent: getUserAgent(request.headers),
-    });
+    const data = await response.json();
+    return NextResponse.json(data);
 
-    return NextResponse.json({ role });
-  } catch (error: any) {
-    console.error('Unexpected error in POST /api/roles:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+  } catch (error) {
+    console.error('Error assigning role:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }
 }

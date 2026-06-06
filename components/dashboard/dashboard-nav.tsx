@@ -36,8 +36,7 @@ const navSections = [
     title: 'User Management',
     items: [
       { href: '/dashboard/users', label: 'Users', icon: Users },
-      { href: '/dashboard/organizations', label: 'Organizations', icon: Building2 },
-      { href: '/dashboard/roles', label: 'Roles', icon: Shield },
+      { href: '/dashboard/spaces', label: 'Spaces', icon: Building2 },
     ],
   },
   {
@@ -71,6 +70,7 @@ const navSections = [
   {
     title: 'System',
     items: [
+      { href: '/dashboard/infrastructure-health', label: 'Infrastructure Health', icon: Activity },
       { href: '/dashboard/api-keys', label: 'API Keys', icon: Key },
       { href: '/dashboard/settings', label: 'Settings', icon: Settings },
     ],

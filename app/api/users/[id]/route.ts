@@ -1,62 +1,52 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-import { createClient as createServiceClient } from '@supabase/supabase-js';
-import { isAdminRole as checkIsAdminRole, isSuperAdminRole as checkIsSuperAdminRole } from '@/lib/auth/role-utils';
+import { cookies } from 'next/headers';
 
-// GET /api/users/[id] - Get a single user by ID
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
+
+/**
+ * API Route: GET /api/users/:id
+ * Fetch a single user by ID (proxies to backend with ADMIN role check)
+ */
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = await createClient();
-
-    // Check authentication
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Check admin privileges
-    const hasAdminAccess = await checkIsAdminRole(user.id);
-    if (!hasAdminAccess) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
-
     const { id } = await params;
+    
+    // Get auth token from cookies
+    const cookieStore = await cookies();
+    const token = cookieStore.get('unifesto_admin_token')?.value;
 
-    // Use service role client to bypass RLS
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-    const adminClient = createServiceClient(supabaseUrl, serviceRoleKey, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Unauthorized - No authentication token' },
+        { status: 401 }
+      );
+    }
+
+    // Forward request to backend
+    const response = await fetch(`${BACKEND_URL}/users/${id}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
       },
     });
 
-    // Fetch user profile using admin client
-    const { data: userProfile, error } = await adminClient
-      .from('profiles')
-      .select('*')
-      .eq('id', id)
-      .single();
-
-    if (error) {
-      if (error.code === 'PGRST116') {
-        return NextResponse.json({ error: 'User not found' }, { status: 404 });
-      }
-      console.error('Error fetching user:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      return NextResponse.json(
+        { error: errorData.message || 'Failed to fetch user from backend' },
+        { status: response.status }
+      );
     }
 
-    return NextResponse.json({ user: userProfile });
+    const data = await response.json();
+    return NextResponse.json(data);
+
   } catch (error) {
-    console.error('Unexpected error:', error);
+    console.error('Error fetching user:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -64,164 +54,69 @@ export async function GET(
   }
 }
 
-// PATCH /api/users/[id] - Update a user
+/**
+ * API Route: PATCH /api/users/:id
+ * Update a user
+ */
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = await createClient();
-
-    // Check authentication
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Check admin privileges
-    const hasAdminAccess = await checkIsAdminRole(user.id);
-    if (!hasAdminAccess) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
-
     const { id } = await params;
+    
+    // Get auth token from cookies
+    const cookieStore = await cookies();
+    const token = cookieStore.get('unifesto_admin_token')?.value;
 
-    // Use service role client to bypass RLS
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-    const adminClient = createServiceClient(supabaseUrl, serviceRoleKey, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-      },
-    });
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Unauthorized - No authentication token' },
+        { status: 401 }
+      );
+    }
 
+    // Get request body
     const body = await request.json();
-    const { name, username, email, phone, bio, role, is_active, is_banned, ban_reason, is_verified } = body;
 
-    // Build update object
-    const updates: any = {
-      updated_at: new Date().toISOString(),
-    };
-
-    if (name !== undefined) updates.name = name;
-    if (username !== undefined) updates.username = username;
-    if (email !== undefined) updates.email = email;
-    if (phone !== undefined) updates.phone = phone;
-    if (bio !== undefined) updates.bio = bio;
-    if (role !== undefined) updates.role = role;
-    if (is_active !== undefined) updates.is_active = is_active;
-    if (is_banned !== undefined) updates.is_banned = is_banned;
-    if (ban_reason !== undefined) updates.ban_reason = ban_reason;
-    if (is_verified !== undefined) updates.is_verified = is_verified;
-
-    // Update profile using admin client
-    const { data: updatedProfile, error: updateError } = await adminClient
-      .from('profiles')
-      .update(updates)
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (updateError) {
-      if (updateError.code === 'PGRST116') {
-        return NextResponse.json({ error: 'User not found' }, { status: 404 });
-      }
-      console.error('Error updating user:', updateError);
-      return NextResponse.json({ error: updateError.message }, { status: 500 });
-    }
-
-    // If email is being updated, update it in Supabase Auth as well
-    if (email) {
-      const { error: authUpdateError } = await adminClient.auth.admin.updateUserById(
-        id,
-        { email }
-      );
-
-      if (authUpdateError) {
-        console.error('Error updating user email in auth:', authUpdateError);
-        // Continue anyway, profile is updated
-      }
-    }
-
-    return NextResponse.json({
-      user: updatedProfile,
-      message: 'User updated successfully',
-    });
-  } catch (error) {
-    console.error('Unexpected error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
-  }
-}
-
-// DELETE /api/users/[id] - Delete a user
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const supabase = await createClient();
-
-    // Check authentication
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Check admin privileges (only super_admin can delete users)
-    const hasSuperAdminAccess = await checkIsSuperAdminRole(user.id);
-    if (!hasSuperAdminAccess) {
-      return NextResponse.json(
-        { error: 'Forbidden - Only super admins can delete users' },
-        { status: 403 }
-      );
-    }
-
-    const { id } = await params;
-
-    // Prevent self-deletion
-    if (id === user.id) {
-      return NextResponse.json(
-        { error: 'Cannot delete your own account' },
-        { status: 400 }
-      );
-    }
-
-    // Use service role client to bypass RLS
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-    const adminClient = createServiceClient(supabaseUrl, serviceRoleKey, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
+    // Forward request to backend
+    const response = await fetch(`${BACKEND_URL}/users/${id}`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
       },
+      body: JSON.stringify(body),
     });
 
-    // Delete user from Supabase Auth (this will cascade to profiles table)
-    const { error: deleteError } = await adminClient.auth.admin.deleteUser(id);
-
-    if (deleteError) {
-      console.error('Error deleting user:', deleteError);
-      return NextResponse.json({ error: deleteError.message }, { status: 500 });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      return NextResponse.json(
+        { error: errorData.message || 'Failed to update user' },
+        { status: response.status }
+      );
     }
 
-    return NextResponse.json({ message: 'User deleted successfully' });
+    const data = await response.json();
+    return NextResponse.json(data);
+
   } catch (error) {
-    console.error('Unexpected error:', error);
+    console.error('Error updating user:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
     );
   }
 }
+
+/**
+ * API Route: DELETE /api/users/:id
+ * Delete a user
+ */
+export async function DELETE(request: NextRequest) {
+  return NextResponse.json(
+    { error: 'Not implemented - Supabase removed, replace with backend API' },
+    { status: 501 }
+  );
+}
+

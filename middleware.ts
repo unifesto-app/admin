@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
-import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+import axios from 'axios';
 
-const ADMIN_ROLES = new Set(['org_admin', 'org_super_admin', 'super_admin']);
-const DEFAULT_ADMIN_EMAIL = 'unifestoapp@gmail.com';
 const LOGIN_RATE_LIMIT_WINDOW_MS = 60_000;
 const LOGIN_RATE_LIMIT_MAX_REQUESTS = 40;
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
+
+// Session cache configuration
+const SESSION_CACHE_TTL_MS = 30_000; // 30 seconds cache
+const SESSION_CACHE_MAX_SIZE = 1000; // Maximum number of cached sessions
+
+// Admin role codes from the new system
+const ADMIN_ROLES = new Set(['ADMIN', 'SUPER_ADMIN', 'ORG_SUPER_ADMIN', 'ORG_ADMIN']);
 
 type RateLimitEntry = {
   count: number;
@@ -13,6 +18,13 @@ type RateLimitEntry = {
 };
 
 type RateLimitStore = Map<string, RateLimitEntry>;
+
+type SessionCacheEntry = {
+  data: { user: any; roles: any[] };
+  expiresAt: number;
+};
+
+type SessionCacheStore = Map<string, SessionCacheEntry>;
 
 const securityHeaders = {
   'X-Frame-Options': 'DENY',
@@ -32,6 +44,63 @@ const getRateLimitStore = (): RateLimitStore => {
   }
 
   return globalRateStore.__ufAdminRateStore;
+};
+
+const getSessionCacheStore = (): SessionCacheStore => {
+  const globalSessionCache = globalThis as typeof globalThis & {
+    __ufAdminSessionCache?: SessionCacheStore;
+  };
+
+  if (!globalSessionCache.__ufAdminSessionCache) {
+    globalSessionCache.__ufAdminSessionCache = new Map<string, SessionCacheEntry>();
+  }
+
+  return globalSessionCache.__ufAdminSessionCache;
+};
+
+const cleanExpiredSessions = () => {
+  const now = Date.now();
+  const cache = getSessionCacheStore();
+  
+  // Clean expired entries
+  for (const [key, entry] of cache.entries()) {
+    if (now > entry.expiresAt) {
+      cache.delete(key);
+    }
+  }
+  
+  // Limit cache size (LRU-style: remove oldest if too large)
+  if (cache.size > SESSION_CACHE_MAX_SIZE) {
+    const entriesToRemove = cache.size - SESSION_CACHE_MAX_SIZE;
+    const keys = Array.from(cache.keys());
+    for (let i = 0; i < entriesToRemove; i++) {
+      cache.delete(keys[i]);
+    }
+  }
+};
+
+const getCachedSession = (token: string): { user: any; roles: any[] } | null => {
+  const cache = getSessionCacheStore();
+  const entry = cache.get(token);
+  
+  if (!entry) return null;
+  
+  const now = Date.now();
+  if (now > entry.expiresAt) {
+    cache.delete(token);
+    return null;
+  }
+  
+  return entry.data;
+};
+
+const setCachedSession = (token: string, data: { user: any; roles: any[] }) => {
+  cleanExpiredSessions();
+  const cache = getSessionCacheStore();
+  cache.set(token, {
+    data,
+    expiresAt: Date.now() + SESSION_CACHE_TTL_MS,
+  });
 };
 
 const getClientIp = (request: NextRequest) => {
@@ -85,28 +154,65 @@ const withSecurityHeaders = (response: NextResponse) => {
   return response;
 };
 
-const isAdminRole = (role: unknown): role is string => {
-  return typeof role === 'string' && ADMIN_ROLES.has(role);
+const getTokenFromCookies = (request: NextRequest): string | null => {
+  return request.cookies.get('unifesto_admin_token')?.value || null;
 };
 
-const getPrivilegedEmails = () => {
-  const raw = process.env.ADMIN_PRIVILEGED_EMAILS ?? DEFAULT_ADMIN_EMAIL;
-  return new Set(
-    raw
-      .split(',')
-      .map((email) => email.trim().toLowerCase())
-      .filter(Boolean)
-  );
-};
+async function validateSession(token: string): Promise<{ user: any; roles: any[] } | null> {
+  // Check cache first
+  const cached = getCachedSession(token);
+  if (cached) {
+    return cached;
+  }
+
+  try {
+    // Validate token with backend
+    const sessionResponse = await axios.get(`${BACKEND_URL}/auth/session`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      timeout: 5000,
+    });
+
+    if (!sessionResponse.data?.user) {
+      return null;
+    }
+
+    const user = sessionResponse.data.user;
+
+    // Get user roles
+    const rolesResponse = await axios.get(`${BACKEND_URL}/roles/users/${user.id}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      timeout: 5000,
+    });
+
+    const roles = rolesResponse.data || [];
+    const sessionData = { user, roles };
+
+    // Cache the session
+    setCachedSession(token, sessionData);
+
+    return sessionData;
+  } catch (error) {
+    console.error('Session validation error:', error);
+    return null;
+  }
+}
+
+function hasAdminRole(roles: any[]): boolean {
+  return roles.some((userRole) => {
+    const roleCode = userRole.role?.code || userRole.roleCode;
+    return ADMIN_ROLES.has(roleCode);
+  });
+}
 
 export async function middleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   // Rate limiting for auth routes
-  if (pathname === '/login' || pathname === '/auth/callback') {
+  if (pathname === '/login' || pathname.startsWith('/auth/')) {
     const clientIp = getClientIp(request);
     const limited = isRateLimited(`${pathname}:${clientIp}`);
     if (limited) {
@@ -119,111 +225,24 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // Check Supabase configuration
-  if (!supabaseUrl || !supabaseKey) {
-    if (pathname.startsWith('/dashboard')) {
-      const loginUrl = new URL('/login', request.url);
-      loginUrl.searchParams.set('next', `${pathname}${search}`);
-      loginUrl.searchParams.set('error', 'supabase-config-missing');
-      return withSecurityHeaders(NextResponse.redirect(loginUrl));
-    }
-    return withSecurityHeaders(NextResponse.next());
-  }
-
   let response = NextResponse.next({
     request: {
       headers: request.headers,
     },
   });
 
-  const supabase = createServerClient(
-    supabaseUrl,
-    supabaseKey,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-          response = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
-        },
-      },
-    }
-  );
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  let role: string | null = null;
-  let isActive: boolean = true;
-  let isBanned: boolean = false;
+  // Get token from cookies
+  const token = getTokenFromCookies(request);
   
-  if (user) {
-    let profileById: { role?: string; is_active?: boolean; is_banned?: boolean } | null = null;
-    let profileByEmail: { role?: string; is_active?: boolean; is_banned?: boolean } | null = null;
+  let sessionData: { user: any; roles: any[] } | null = null;
+  let isAuthenticated = false;
+  let isAuthorizedAdmin = false;
 
-    if (serviceRoleKey) {
-      const adminClient = createSupabaseClient(supabaseUrl, serviceRoleKey, {
-        auth: {
-          persistSession: false,
-          autoRefreshToken: false,
-          detectSessionInUrl: false,
-        },
-      });
-
-      const { data: byId } = await adminClient
-        .from('profiles_with_roles')
-        .select('role,is_active,is_banned')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      profileById = byId ?? null;
-
-      if (!profileById?.role && user.email) {
-        const { data: byEmail } = await adminClient
-          .from('profiles_with_roles')
-          .select('role,is_active,is_banned')
-          .ilike('email', user.email)
-          .maybeSingle();
-
-        profileByEmail = byEmail ?? null;
-      }
-    } else {
-      const { data: byId } = await supabase
-        .from('profiles_with_roles')
-        .select('role,is_active,is_banned')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      profileById = byId ?? null;
-
-      if (!profileById?.role && user.email) {
-        const { data: byEmail } = await supabase
-          .from('profiles_with_roles')
-          .select('role,is_active,is_banned')
-          .ilike('email', user.email)
-          .maybeSingle();
-
-        profileByEmail = byEmail ?? null;
-      }
-    }
-
-    role = profileById?.role ?? null;
-    isActive = profileById?.is_active ?? true;
-    isBanned = profileById?.is_banned ?? false;
-    role = role ?? profileByEmail?.role ?? null;
-    isActive = isActive ?? profileByEmail?.is_active ?? true;
-    isBanned = isBanned ?? profileByEmail?.is_banned ?? false;
+  if (token) {
+    sessionData = await validateSession(token);
+    isAuthenticated = !!sessionData;
+    isAuthorizedAdmin = sessionData ? hasAdminRole(sessionData.roles) : false;
   }
-
-  const isAuthenticated = Boolean(user);
-  const privilegedEmails = getPrivilegedEmails();
-  const isPrivilegedEmail = Boolean(user?.email && privilegedEmails.has(user.email.toLowerCase()));
-  const isActiveProfile = isActive && !isBanned;
-  const isAuthorizedAdmin = (isAdminRole(role) && isActiveProfile) || isPrivilegedEmail;
 
   // Protect dashboard routes
   if (pathname.startsWith('/dashboard')) {
@@ -251,5 +270,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/login', '/auth/callback'],
+  matcher: ['/dashboard/:path*', '/login', '/auth/:path*'],
 };

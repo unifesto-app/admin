@@ -1,43 +1,33 @@
-import { createClient } from '@/lib/supabase/server';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Users, Building2, Calendar, CreditCard } from 'lucide-react';
 
 export default async function DashboardPage() {
-  const supabase = await createClient();
-
-  // Fetch dashboard statistics
-  const [usersCount, orgsCount, eventsCount, transactionsCount] = await Promise.all([
-    supabase.from('profiles').select('*', { count: 'exact', head: true }),
-    supabase.from('organizations').select('*', { count: 'exact', head: true }),
-    supabase.from('events').select('*', { count: 'exact', head: true }),
-    supabase.from('transactions').select('*', { count: 'exact', head: true }),
-  ]);
-
+  // TODO: Replace with backend API calls
   const stats = [
     {
       title: 'Total Users',
-      value: usersCount.count?.toLocaleString() ?? '0',
+      value: '0',
       description: 'Registered users',
       icon: Users,
       trend: '+12% from last month',
     },
     {
       title: 'Organizations',
-      value: orgsCount.count?.toLocaleString() ?? '0',
+      value: '0',
       description: 'Active organizations',
       icon: Building2,
       trend: '+5% from last month',
     },
     {
       title: 'Events',
-      value: eventsCount.count?.toLocaleString() ?? '0',
+      value: '0',
       description: 'Total events',
       icon: Calendar,
       trend: '+18% from last month',
     },
     {
       title: 'Transactions',
-      value: transactionsCount.count?.toLocaleString() ?? '0',
+      value: '0',
       description: 'All transactions',
       icon: CreditCard,
       trend: '+23% from last month',

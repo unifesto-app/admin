@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
 
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
@@ -8,12 +7,12 @@ export async function GET(request: NextRequest) {
   const safeNext = next.startsWith('/dashboard') ? next : '/dashboard';
 
   if (code) {
-    const supabase = await createClient();
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    // TODO: Replace with backend API authentication
+    const error = null; // Placeholder
 
     const payload = JSON.stringify(
       error
-        ? { type: 'oauth:error', error: error.message }
+        ? { type: 'oauth:error', error: 'Authentication not implemented' }
         : { type: 'oauth:success', next: safeNext }
     );
 

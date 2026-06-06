@@ -7,7 +7,6 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
 import { UserPermissions, Role } from '@/lib/types/rbac';
 import { getOrganizationPermissions } from '@/lib/api/organizations-api';
 import { Shield, Lock } from 'lucide-react';
@@ -40,77 +39,9 @@ export default function PermissionGuard({
 
   const checkPermissions = async () => {
     try {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-
-      if (!user) {
-        setHasPermission(false);
-        setLoading(false);
-        return;
-      }
-
-      // Check platform admin
-      if (requirePlatformAdmin) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', user.id)
-          .single();
-
-        if (profile?.role === 'super_admin') {
-          setHasPermission(true);
-          setLoading(false);
-          return;
-        } else {
-          setHasPermission(false);
-          setLoading(false);
-          return;
-        }
-      }
-
-      // Check organization permissions
-      if (organizationId) {
-        const { data: permissions, error } = await getOrganizationPermissions(organizationId);
-
-        if (error || !permissions) {
-          setHasPermission(false);
-          setLoading(false);
-          return;
-        }
-
-        // Check required role
-        if (requiredRole) {
-          const roleHierarchy: Record<Role, number> = {
-            owner: 4,
-            admin: 3,
-            organizer: 2,
-            member: 1,
-          };
-
-          const userRoleLevel = roleHierarchy[permissions.role];
-          const requiredRoleLevel = roleHierarchy[requiredRole];
-
-          if (userRoleLevel < requiredRoleLevel) {
-            setHasPermission(false);
-            setLoading(false);
-            return;
-          }
-        }
-
-        // Check specific permission
-        if (requiredPermission) {
-          if (!permissions.permissions[requiredPermission]) {
-            setHasPermission(false);
-            setLoading(false);
-            return;
-          }
-        }
-
-        setHasPermission(true);
-      } else {
-        // No specific checks, allow access
-        setHasPermission(true);
-      }
+      // TODO: Replace with backend API authentication
+      setHasPermission(false);
+      setLoading(false);
     } catch (error) {
       console.error('Error checking permissions:', error);
       setHasPermission(false);
@@ -222,30 +153,9 @@ export function usePermissions(organizationId?: string) {
 
   const loadPermissions = async () => {
     try {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-
-      if (!user) {
-        setLoading(false);
-        return;
-      }
-
-      // Check platform admin
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single();
-
-      setIsPlatformAdmin(profile?.role === 'super_admin');
-
-      // Get organization permissions
-      if (organizationId) {
-        const { data, error } = await getOrganizationPermissions(organizationId);
-        if (!error && data) {
-          setPermissions(data);
-        }
-      }
+      // TODO: Replace with backend API authentication
+      setIsPlatformAdmin(false);
+      setPermissions(null);
     } catch (error) {
       console.error('Error loading permissions:', error);
     } finally {

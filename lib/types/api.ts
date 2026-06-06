@@ -32,11 +32,15 @@ export interface UserCreateResponse {
 }
 
 export interface UserUpdateRequest {
-  name?: string;
+  fullName?: string;
   username?: string;
   email?: string;
   phone?: string;
   bio?: string;
+  linkedinUrl?: string;
+  instagramUrl?: string;
+  githubUrl?: string;
+  websiteUrl?: string;
   role?: PlatformRole;
   is_active?: boolean;
   is_banned?: boolean;

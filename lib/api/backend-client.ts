@@ -6,10 +6,25 @@
  */
 
 import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
-import { createClient } from '@/lib/supabase/client';
 
 // Backend API base URL
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3000';
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
+
+// Get token from cookie (primary) or localStorage (fallback)
+const getToken = (): string | null => {
+  if (typeof window === 'undefined') return null;
+  
+  // First try to get from cookie
+  const cookies = document.cookie.split(';');
+  const tokenCookie = cookies.find(c => c.trim().startsWith('unifesto_admin_token='));
+  
+  if (tokenCookie) {
+    return tokenCookie.split('=')[1];
+  }
+  
+  // Fallback to localStorage for backwards compatibility
+  return localStorage.getItem('unifesto_admin_token');
+};
 
 // Create axios instance
 const backendClient: AxiosInstance = axios.create({
@@ -24,15 +39,12 @@ const backendClient: AxiosInstance = axios.create({
 backendClient.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
     try {
-      // Get Supabase client
-      const supabase = createClient();
-      
-      // Get current session
-      const { data: { session } } = await supabase.auth.getSession();
+      // Get token from localStorage
+      const token = getToken();
       
       // Add JWT token to Authorization header
-      if (session?.access_token) {
-        config.headers.Authorization = `Bearer ${session.access_token}`;
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
       }
       
       return config;

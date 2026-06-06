@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { createUser, updateUser } from '@/lib/api/users';
+import { updateUser } from '@/lib/api/users';
 import type { Profile } from '@/lib/types/database';
 
 interface UserFormModalProps {
@@ -17,41 +17,35 @@ export default function UserFormModal({ user, isOpen, onClose, onSuccess }: User
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    name: '',
+    fullName: '',
     username: '',
-    phone: '',
     bio: '',
-    role: 'attendee' as 'attendee' | 'organizer' | 'org_admin' | 'org_super_admin' | 'super_admin',
-    is_active: true,
-    is_verified: false,
+    linkedinUrl: '',
+    instagramUrl: '',
+    githubUrl: '',
+    websiteUrl: '',
   });
 
   useEffect(() => {
     if (user) {
       setFormData({
-        email: user.email || '',
-        password: '',
-        name: user.name || '',
+        fullName: user.name || '',
         username: user.username || '',
-        phone: user.phone || '',
         bio: user.bio || '',
-        role: user.role,
-        is_active: user.is_active,
-        is_verified: user.is_verified,
+        linkedinUrl: '',
+        instagramUrl: '',
+        githubUrl: '',
+        websiteUrl: '',
       });
     } else {
       setFormData({
-        email: '',
-        password: '',
-        name: '',
+        fullName: '',
         username: '',
-        phone: '',
         bio: '',
-        role: 'attendee',
-        is_active: true,
-        is_verified: false,
+        linkedinUrl: '',
+        instagramUrl: '',
+        githubUrl: '',
+        websiteUrl: '',
       });
     }
     setError('');
@@ -59,65 +53,40 @@ export default function UserFormModal({ user, isOpen, onClose, onSuccess }: User
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!user) {
+      setError('No user selected for editing');
+      return;
+    }
+    
     setLoading(true);
     setError('');
 
     try {
-      if (user) {
-        // Update existing user
-        await updateUser(user.id, {
-          name: formData.name || undefined,
-          username: formData.username || undefined,
-          email: formData.email || undefined,
-          phone: formData.phone || undefined,
-          bio: formData.bio || undefined,
-          role: formData.role,
-          is_active: formData.is_active,
-          is_verified: formData.is_verified,
-        });
-      } else {
-        // Create new user
-        if (!formData.email || !formData.password) {
-          setError('Email and password are required');
-          setLoading(false);
-          return;
-        }
-        await createUser({
-          email: formData.email,
-          password: formData.password,
-          name: formData.name || undefined,
-          username: formData.username || undefined,
-          phone: formData.phone || undefined,
-          role: formData.role,
-          is_active: formData.is_active,
-        });
-      }
+      // Update existing user
+      await updateUser(user.id, {
+        fullName: formData.fullName || undefined,
+        username: formData.username || undefined,
+        bio: formData.bio || undefined,
+      });
       onSuccess();
       onClose();
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to save user';
-      console.error('User creation error:', err);
-      
-      // Check if it's a role constraint error
-      if (errorMessage.toLowerCase().includes('role') && 
-          (errorMessage.toLowerCase().includes('check constraint') || 
-           errorMessage.toLowerCase().includes('violates check'))) {
-        setError('Database error: The selected role is not allowed. Please run the SQL migration to fix this. See QUICK_FIX_USER_ROLES.sql in the project root.');
-      } else {
-        setError(errorMessage);
-      }
+      console.error('User update error:', err);
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || !user) return null;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
       <div className="bg-card rounded-lg shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="sticky top-0 bg-card border-b p-6 flex items-center justify-between">
-          <h2 className="text-2xl font-bold">{user ? 'Edit User' : 'Add New User'}</h2>
+          <h2 className="text-2xl font-bold">Edit User</h2>
           <button
             onClick={onClose}
             className="text-muted-foreground hover:text-foreground"
@@ -129,63 +98,19 @@ export default function UserFormModal({ user, isOpen, onClose, onSuccess }: User
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
           {error && (
             <div className="p-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md">
-              <div className="font-semibold mb-2">❌ {error}</div>
-              {error.includes('database constraint') || error.includes('SQL migration') ? (
-                <div className="text-xs mt-2 space-y-1">
-                  <p className="font-semibold">To fix this error:</p>
-                  <ol className="list-decimal ml-4 space-y-1">
-                    <li>Open Supabase Dashboard → SQL Editor</li>
-                    <li>Copy & paste the SQL from <code className="bg-red-100 px-1 rounded">QUICK_FIX_USER_ROLES.sql</code></li>
-                    <li>Click "Run" to execute</li>
-                    <li>Try creating the user again</li>
-                  </ol>
-                  <p className="mt-2">See <code className="bg-red-100 px-1 rounded">FIX_USER_CREATION_ERROR.md</code> for detailed instructions.</p>
-                </div>
-              ) : null}
+              <div className="font-semibold">❌ {error}</div>
             </div>
           )}
 
           {/* Two Column Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Email */}
+            {/* Full Name */}
             <div>
-              <label className="block text-sm font-medium mb-2">
-                Email <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
-                required
-              />
-            </div>
-
-            {/* Password (only for new users) */}
-            {!user && (
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Password <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="password"
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
-                  required
-                  minLength={6}
-                />
-                <p className="text-xs text-muted-foreground mt-1">Minimum 6 characters</p>
-              </div>
-            )}
-
-            {/* Name */}
-            <div>
-              <label className="block text-sm font-medium mb-2">Name</label>
+              <label className="block text-sm font-medium mb-2">Full Name</label>
               <input
                 type="text"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                value={formData.fullName}
+                onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
                 className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
               />
             </div>
@@ -200,33 +125,6 @@ export default function UserFormModal({ user, isOpen, onClose, onSuccess }: User
                 className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
               />
             </div>
-
-            {/* Phone */}
-            <div>
-              <label className="block text-sm font-medium mb-2">Phone</label>
-              <input
-                type="tel"
-                value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
-              />
-            </div>
-
-            {/* Role */}
-            <div>
-              <label className="block text-sm font-medium mb-2">Role</label>
-              <select
-                value={formData.role}
-                onChange={(e) => setFormData({ ...formData, role: e.target.value as any })}
-                className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
-              >
-                <option value="attendee">Attendee</option>
-                <option value="organizer">Organizer</option>
-                <option value="org_admin">Org Admin</option>
-                <option value="org_super_admin">Org Super Admin</option>
-                <option value="super_admin">Super Admin</option>
-              </select>
-            </div>
           </div>
 
           {/* Bio - Full Width */}
@@ -240,29 +138,68 @@ export default function UserFormModal({ user, isOpen, onClose, onSuccess }: User
             />
           </div>
 
-          {/* Status Checkboxes */}
-          <div>
-            <label className="block text-sm font-medium mb-3">Account Status</label>
-            <div className="flex gap-6">
-              <label className="flex items-center gap-2">
+          {/* Social Links Section */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Social Links</h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* LinkedIn */}
+              <div>
+                <label className="block text-sm font-medium mb-2">LinkedIn URL</label>
                 <input
-                  type="checkbox"
-                  checked={formData.is_active}
-                  onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-                  className="rounded"
+                  type="url"
+                  value={formData.linkedinUrl}
+                  onChange={(e) => setFormData({ ...formData, linkedinUrl: e.target.value })}
+                  placeholder="https://linkedin.com/in/..."
+                  className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
                 />
-                <span className="text-sm">Active</span>
-              </label>
-              <label className="flex items-center gap-2">
+              </div>
+
+              {/* Instagram */}
+              <div>
+                <label className="block text-sm font-medium mb-2">Instagram URL</label>
                 <input
-                  type="checkbox"
-                  checked={formData.is_verified}
-                  onChange={(e) => setFormData({ ...formData, is_verified: e.target.checked })}
-                  className="rounded"
+                  type="url"
+                  value={formData.instagramUrl}
+                  onChange={(e) => setFormData({ ...formData, instagramUrl: e.target.value })}
+                  placeholder="https://instagram.com/..."
+                  className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
                 />
-                <span className="text-sm">Verified</span>
-              </label>
+              </div>
+
+              {/* GitHub */}
+              <div>
+                <label className="block text-sm font-medium mb-2">GitHub URL</label>
+                <input
+                  type="url"
+                  value={formData.githubUrl}
+                  onChange={(e) => setFormData({ ...formData, githubUrl: e.target.value })}
+                  placeholder="https://github.com/..."
+                  className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+              </div>
+
+              {/* Website */}
+              <div>
+                <label className="block text-sm font-medium mb-2">Website URL</label>
+                <input
+                  type="url"
+                  value={formData.websiteUrl}
+                  onChange={(e) => setFormData({ ...formData, websiteUrl: e.target.value })}
+                  placeholder="https://..."
+                  className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+              </div>
             </div>
+          </div>
+
+          <div className="p-4 text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-md">
+            <div className="font-semibold mb-2">📝 Note</div>
+            <ul className="list-disc ml-4 space-y-1 text-xs">
+              <li>Email and phone number are managed via user identities</li>
+              <li>Role assignments are managed via the roles management system</li>
+              <li>Avatar can be uploaded by the user in their profile</li>
+            </ul>
           </div>
 
           {/* Actions */}
@@ -281,7 +218,7 @@ export default function UserFormModal({ user, isOpen, onClose, onSuccess }: User
               className="flex-1"
               disabled={loading}
             >
-              {loading ? 'Saving...' : user ? 'Update User' : 'Create User'}
+              {loading ? 'Saving...' : 'Update User'}
             </Button>
           </div>
         </form>

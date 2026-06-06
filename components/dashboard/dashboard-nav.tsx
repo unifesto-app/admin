@@ -23,6 +23,11 @@ import {
   Activity,
   Tag,
   Smartphone,
+  Cloud,
+  Database,
+  HardDrive,
+  Mail,
+  MessageSquare,
 } from 'lucide-react';
 
 const navSections = [
@@ -73,6 +78,16 @@ const navSections = [
       { href: '/dashboard/infrastructure-health', label: 'Infrastructure Health', icon: Activity },
       { href: '/dashboard/api-keys', label: 'API Keys', icon: Key },
       { href: '/dashboard/settings', label: 'Settings', icon: Settings },
+    ],
+  },
+  {
+    title: 'AWS',
+    items: [
+      { href: '/dashboard/aws/ec2', label: 'EC2 Instances', icon: HardDrive },
+      { href: '/dashboard/aws/rds', label: 'RDS Databases', icon: Database },
+      { href: '/dashboard/aws/s3', label: 'S3 Buckets', icon: Cloud },
+      { href: '/dashboard/aws/ses', label: 'SES Email', icon: Mail },
+      { href: '/dashboard/aws/sns', label: 'SNS Notifications', icon: MessageSquare },
     ],
   },
 ];

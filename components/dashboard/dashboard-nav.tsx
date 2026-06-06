@@ -26,6 +26,7 @@ import {
   Cloud,
   Database,
   HardDrive,
+  Server,
   Mail,
   MessageSquare,
 } from 'lucide-react';
@@ -75,7 +76,6 @@ const navSections = [
   {
     title: 'System',
     items: [
-      { href: '/dashboard/infrastructure-health', label: 'Infrastructure Health', icon: Activity },
       { href: '/dashboard/api-keys', label: 'API Keys', icon: Key },
       { href: '/dashboard/settings', label: 'Settings', icon: Settings },
     ],
@@ -83,11 +83,13 @@ const navSections = [
   {
     title: 'AWS',
     items: [
-      { href: '/dashboard/aws/ec2', label: 'EC2 Instances', icon: HardDrive },
+      { href: '/dashboard/aws/overview', label: 'Overview', icon: Activity },
+      { href: '/dashboard/aws/health', label: 'Infra Health', icon: Shield },
+      { href: '/dashboard/aws/ec2', label: 'EC2 Instances', icon: Server },
       { href: '/dashboard/aws/rds', label: 'RDS Databases', icon: Database },
-      { href: '/dashboard/aws/s3', label: 'S3 Buckets', icon: Cloud },
-      { href: '/dashboard/aws/ses', label: 'SES Email', icon: Mail },
-      { href: '/dashboard/aws/sns', label: 'SNS Notifications', icon: MessageSquare },
+      { href: '/dashboard/aws/cache', label: 'ElastiCache', icon: HardDrive },
+      { href: '/dashboard/aws/s3', label: 'S3 Storage', icon: Cloud },
+      { href: '/dashboard/aws/billing', label: 'Billing & Cost', icon: DollarSign },
     ],
   },
 ];

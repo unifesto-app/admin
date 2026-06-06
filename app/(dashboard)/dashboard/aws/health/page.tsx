@@ -98,9 +98,9 @@ export default function InfrastructureHealthPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Infrastructure Health</h1>
+          <h1 className="text-3xl font-bold tracking-tight">AWS Infrastructure Health</h1>
           <p className="text-muted-foreground mt-1">
-            Real-time monitoring of all infrastructure services
+            Real-time monitoring of all AWS infrastructure services
           </p>
         </div>
         <Button onClick={fetchHealth} disabled={loading} variant="outline" size="sm">

@@ -9,21 +9,23 @@ import {
   Database,
   HardDrive,
   Cloud,
-  Shield,
-  DollarSign,
   Activity,
   RefreshCw,
   AlertCircle,
   CheckCircle,
   XCircle,
+  Clock,
+  Zap,
 } from 'lucide-react';
 
 const BASE_URL = 'https://api.unifesto.app';
 
 export default function OverviewPage() {
-  const [data, setData] = useState<any>(null);
+  const [overviewData, setOverviewData] = useState<any>(null);
+  const [healthData, setHealthData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [lastChecked, setLastChecked] = useState<Date>(new Date());
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -36,11 +38,18 @@ export default function OverviewPage() {
         return;
       }
 
-      const response = await axios.get(`${BASE_URL}/aws/overview`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const [overviewRes, healthRes] = await Promise.all([
+        axios.get(`${BASE_URL}/aws/overview`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        axios.get(`${BASE_URL}/aws/health`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+      ]);
 
-      setData(response.data);
+      setOverviewData(overviewRes.data);
+      setHealthData(healthRes.data);
+      setLastChecked(new Date());
     } catch (err: any) {
       if (err.response?.status === 401) {
         localStorage.removeItem('unifesto_admin_token');
@@ -48,7 +57,7 @@ export default function OverviewPage() {
       } else if (err.response?.status === 403) {
         setError('Admin access required');
       } else {
-        setError(err.response?.data?.message || 'Failed to fetch overview data');
+        setError(err.response?.data?.message || 'Failed to fetch data');
       }
     } finally {
       setLoading(false);
@@ -57,7 +66,7 @@ export default function OverviewPage() {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 60000);
+    const interval = setInterval(fetchData, 30000); // 30 seconds
     return () => clearInterval(interval);
   }, [fetchData]);
 
@@ -66,8 +75,11 @@ export default function OverviewPage() {
       healthy: { bg: 'bg-green-500/20', text: 'text-green-400', icon: CheckCircle },
       running: { bg: 'bg-green-500/20', text: 'text-green-400', icon: CheckCircle },
       available: { bg: 'bg-green-500/20', text: 'text-green-400', icon: CheckCircle },
+      connected: { bg: 'bg-green-500/20', text: 'text-green-400', icon: CheckCircle },
+      online: { bg: 'bg-green-500/20', text: 'text-green-400', icon: CheckCircle },
       unknown: { bg: 'bg-gray-500/20', text: 'text-gray-400', icon: AlertCircle },
       error: { bg: 'bg-red-500/20', text: 'text-red-400', icon: XCircle },
+      disconnected: { bg: 'bg-red-500/20', text: 'text-red-400', icon: XCircle },
     };
 
     const config = statusConfig[status?.toLowerCase()] || statusConfig.unknown;
@@ -81,12 +93,42 @@ export default function OverviewPage() {
     );
   };
 
-  if (loading && !data) {
+  const getOverallStatusColor = (status: 'healthy' | 'degraded' | 'down') => {
+    switch (status) {
+      case 'healthy':
+        return 'bg-green-500/10 border-green-500/20';
+      case 'degraded':
+        return 'bg-yellow-500/10 border-yellow-500/20';
+      case 'down':
+        return 'bg-red-500/10 border-red-500/20';
+    }
+  };
+
+  const formatUptime = (seconds: number) => {
+    const days = Math.floor(seconds / 86400);
+    const hours = Math.floor((seconds % 86400) / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    
+    if (days > 0) return `${days}d ${hours}h ${minutes}m`;
+    if (hours > 0) return `${hours}h ${minutes}m`;
+    return `${minutes}m`;
+  };
+
+  const formatLastChecked = (date: Date) => {
+    const now = new Date();
+    const diff = Math.floor((now.getTime() - date.getTime()) / 1000);
+    
+    if (diff < 60) return `${diff}s ago`;
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    return date.toLocaleTimeString();
+  };
+
+  if (loading && !overviewData) {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="flex flex-col items-center gap-3">
           <RefreshCw className="w-8 h-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">Loading overview...</p>
+          <p className="text-sm text-muted-foreground">Loading AWS infrastructure...</p>
         </div>
       </div>
     );
@@ -110,69 +152,16 @@ export default function OverviewPage() {
     );
   }
 
-  const services = data?.services || {};
-  const costs = data?.estimatedMonthlyCost || {};
-
-  const serviceCards = [
-    {
-      name: 'EC2',
-      key: 'ec2',
-      icon: Server,
-      color: 'text-orange-500',
-      details: [
-        { label: 'Type', value: services.ec2?.instanceType },
-        { label: 'Public IP', value: services.ec2?.publicIp },
-      ],
-    },
-    {
-      name: 'RDS',
-      key: 'rds',
-      icon: Database,
-      color: 'text-blue-500',
-      details: [
-        { label: 'Engine', value: services.rds?.engine },
-        { label: 'Storage', value: `${services.rds?.storageGB || 0} GB` },
-      ],
-    },
-    {
-      name: 'ElastiCache',
-      key: 'elasticache',
-      icon: HardDrive,
-      color: 'text-red-500',
-      details: [
-        { label: 'Node Type', value: services.elasticache?.nodeType },
-        { label: 'Engine', value: services.elasticache?.engine },
-      ],
-    },
-    {
-      name: 'S3',
-      key: 's3',
-      icon: Cloud,
-      color: 'text-green-500',
-      details: [
-        { label: 'Bucket', value: services.s3?.bucketName },
-        { label: 'Region', value: services.s3?.region },
-      ],
-    },
-    {
-      name: 'IAM',
-      key: 'iam',
-      icon: Shield,
-      color: 'text-purple-500',
-      details: [
-        { label: 'Role', value: services.iam?.roleName },
-      ],
-    },
-  ];
+  const services = overviewData?.services || {};
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">AWS Overview</h1>
+          <h1 className="text-3xl font-bold tracking-tight">AWS Infrastructure</h1>
           <p className="text-muted-foreground mt-1">
-            Region: {data?.region || 'ap-south-1'} (Mumbai)
+            Region: {overviewData?.region || 'ap-south-1'} (Mumbai) • Last checked: {formatLastChecked(lastChecked)}
           </p>
         </div>
         <Button onClick={fetchData} disabled={loading} variant="outline" size="sm">
@@ -181,140 +170,227 @@ export default function OverviewPage() {
         </Button>
       </div>
 
-      {/* Total Cost Card */}
-      <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
-        <CardContent className="pt-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground mb-1">Estimated Monthly Cost</p>
-              <p className="text-4xl font-bold">${costs.total || 0}</p>
-              <p className="text-xs text-muted-foreground mt-1">All AWS services</p>
-            </div>
-            <DollarSign className="w-16 h-16 text-primary/50" />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Service Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {serviceCards.map((service) => {
-          const Icon = service.icon;
-          const serviceData = services[service.key];
-          const status = serviceData?.state || serviceData?.status || 'unknown';
-          const cost = costs[service.key] || 0;
-          const hasError = serviceData?.error;
-
-          return (
-            <Card key={service.key} className="hover:shadow-lg transition-shadow">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between mb-2">
-                  <Icon className={`w-8 h-8 ${service.color}`} />
-                  <StatusBadge status={hasError ? 'error' : status} />
+      {/* Overall Health Banner */}
+      {healthData && (
+        <Card className={`border-2 ${getOverallStatusColor(healthData.status)}`}>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Activity className="h-6 w-6 text-primary" />
                 </div>
-                <CardTitle className="text-xl">{service.name}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {!hasError ? (
-                    <>
-                      {service.details.map((detail, idx) => (
-                        <div key={idx} className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">{detail.label}:</span>
-                          <span className="font-medium truncate ml-2 max-w-[150px]">
-                            {detail.value || 'N/A'}
-                          </span>
-                        </div>
-                      ))}
-                      <div className="flex justify-between pt-2 mt-2 border-t">
-                        <span className="text-sm text-muted-foreground">Cost/month:</span>
-                        <span className="font-semibold text-green-500">${cost}</span>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="text-sm text-destructive">
-                      Failed to fetch service data
+                <div>
+                  <h2 className="text-xl font-bold">
+                    {healthData.status === 'healthy' ? 'All Systems Operational' : 
+                     healthData.status === 'degraded' ? 'Some Services Degraded' : 'System Down'}
+                  </h2>
+                  <p className="text-sm text-muted-foreground">
+                    Overall infrastructure health status
+                  </p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-sm text-muted-foreground">System Status</p>
+                <p className="text-2xl font-bold capitalize">{healthData.status}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Service Overview Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* EC2 */}
+        <Card className="hover:shadow-lg transition-shadow">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between mb-2">
+              <Server className="w-8 h-8 text-orange-500" />
+              <StatusBadge status={services.ec2?.error ? 'error' : services.ec2?.state || 'unknown'} />
+            </div>
+            <CardTitle className="text-xl">EC2</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {!services.ec2?.error ? (
+                <>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Type:</span>
+                    <span className="font-medium">{services.ec2?.instanceType || 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Public IP:</span>
+                    <span className="font-medium truncate ml-2 max-w-[150px]">
+                      {services.ec2?.publicIp 
+                        ? `***.***.***.${services.ec2.publicIp.split('.')[3]}`
+                        : 'N/A'}
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <div className="text-sm text-destructive">Failed to fetch service data</div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* RDS */}
+        <Card className="hover:shadow-lg transition-shadow">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between mb-2">
+              <Database className="w-8 h-8 text-blue-500" />
+              <StatusBadge status={
+                services.rds?.error ? 'error' : 
+                healthData?.services?.database?.status || services.rds?.status || 'unknown'
+              } />
+            </div>
+            <CardTitle className="text-xl">RDS Database</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {!services.rds?.error ? (
+                <>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Engine:</span>
+                    <span className="font-medium">{services.rds?.engine || 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Storage:</span>
+                    <span className="font-medium">{services.rds?.storageGB || 0} GB</span>
+                  </div>
+                  {healthData?.services?.database && (
+                    <div className="flex items-center justify-between text-sm pt-2 border-t">
+                      <span className="text-muted-foreground">Latency:</span>
+                      <span className="font-medium flex items-center gap-1">
+                        <Zap className="h-3 w-3" />
+                        {healthData.services.database.latency}ms
+                      </span>
                     </div>
                   )}
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
+                </>
+              ) : (
+                <div className="text-sm text-destructive">Failed to fetch service data</div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* ElastiCache */}
+        <Card className="hover:shadow-lg transition-shadow">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between mb-2">
+              <HardDrive className="w-8 h-8 text-red-500" />
+              <StatusBadge status={
+                services.elasticache?.error ? 'error' :
+                healthData?.services?.redis?.status || services.elasticache?.status || 'unknown'
+              } />
+            </div>
+            <CardTitle className="text-xl">ElastiCache</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {!services.elasticache?.error ? (
+                <>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Node Type:</span>
+                    <span className="font-medium truncate ml-2 max-w-[150px]">
+                      {services.elasticache?.nodeType || 'N/A'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Engine:</span>
+                    <span className="font-medium">{services.elasticache?.engine || 'N/A'}</span>
+                  </div>
+                  {healthData?.services?.redis && (
+                    <div className="flex items-center justify-between text-sm pt-2 border-t">
+                      <span className="text-muted-foreground">Latency:</span>
+                      <span className="font-medium flex items-center gap-1">
+                        <Zap className="h-3 w-3" />
+                        {healthData.services.redis.latency}ms
+                      </span>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="text-sm text-destructive">Failed to fetch service data</div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* S3 */}
+        <Card className="hover:shadow-lg transition-shadow">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between mb-2">
+              <Cloud className="w-8 h-8 text-green-500" />
+              <StatusBadge status={
+                services.s3?.error ? 'error' :
+                healthData?.services?.storage?.status || 'available'
+              } />
+            </div>
+            <CardTitle className="text-xl">S3 Storage</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {!services.s3?.error ? (
+                <>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Bucket:</span>
+                    <span className="font-medium truncate ml-2 max-w-[150px]">
+                      {services.s3?.bucketName || 'N/A'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Region:</span>
+                    <span className="font-medium">{services.s3?.region || 'N/A'}</span>
+                  </div>
+                  {healthData?.services?.storage && (
+                    <div className="flex items-center justify-between text-sm pt-2 border-t">
+                      <span className="text-muted-foreground">Latency:</span>
+                      <span className="font-medium flex items-center gap-1">
+                        <Zap className="h-3 w-3" />
+                        {healthData.services.storage.latency}ms
+                      </span>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="text-sm text-destructive">Failed to fetch service data</div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Cost Breakdown */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Cost Breakdown</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {Object.entries(costs)
-              .filter(([key]) => key !== 'total')
-              .map(([key, value]: [string, any]) => {
-                const percentage = costs.total > 0 ? Math.round((value / costs.total) * 100) : 0;
-                const service = serviceCards.find((s) => s.key === key);
-                const Icon = service?.icon || Activity;
-
-                return (
-                  <div key={key} className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Icon className="w-4 h-4 text-muted-foreground" />
-                        <span className="font-medium capitalize">{key}</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm text-muted-foreground">{percentage}%</span>
-                        <span className="font-bold">${value}</span>
-                      </div>
-                    </div>
-                    <div className="h-2 bg-secondary rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-primary transition-all"
-                        style={{ width: `${percentage}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Quick Links */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <Button variant="outline" className="h-auto py-4 flex-col gap-2" asChild>
-              <a href="/dashboard/aws/health">
-                <Activity className="w-6 h-6" />
-                <span className="text-sm">Infrastructure Health</span>
-              </a>
-            </Button>
-            <Button variant="outline" className="h-auto py-4 flex-col gap-2" asChild>
-              <a href="/dashboard/aws/ec2">
-                <Server className="w-6 h-6" />
-                <span className="text-sm">EC2 Details</span>
-              </a>
-            </Button>
-            <Button variant="outline" className="h-auto py-4 flex-col gap-2" asChild>
-              <a href="/dashboard/aws/rds">
-                <Database className="w-6 h-6" />
-                <span className="text-sm">Database</span>
-              </a>
-            </Button>
-            <Button variant="outline" className="h-auto py-4 flex-col gap-2" asChild>
-              <a href="/dashboard/aws/billing">
-                <DollarSign className="w-6 h-6" />
-                <span className="text-sm">Billing</span>
-              </a>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Application Server Health */}
+      {healthData?.services?.app && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle>Application Server</CardTitle>
+              <StatusBadge status={healthData.services.app.status} />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <div>
+                <p className="text-sm text-muted-foreground mb-1">Uptime</p>
+                <p className="text-xl font-bold flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  {formatUptime(healthData.services.app.uptime)}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground mb-1">Memory Usage</p>
+                <p className="text-xl font-bold">{healthData.services.app.memoryMB} MB</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground mb-1">Platform</p>
+                <p className="text-xl font-bold">NestJS 11</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

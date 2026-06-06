@@ -161,7 +161,11 @@ export default function EC2Page() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Public IP</p>
-                <p className="font-mono text-sm mt-1">{ec2.publicIp || 'N/A'}</p>
+                <p className="font-mono text-sm mt-1">
+                  {ec2.publicIp 
+                    ? `***.***.***.${ec2.publicIp.split('.')[3]}`
+                    : 'N/A'}
+                </p>
               </div>
             </div>
           </CardContent>

@@ -14,7 +14,6 @@ import {
   FileText,
   Megaphone,
   Key,
-  Shield,
   Briefcase,
   FolderOpen,
   DollarSign,
@@ -84,7 +83,6 @@ const navSections = [
     title: 'AWS',
     items: [
       { href: '/dashboard/aws/overview', label: 'Overview', icon: Activity },
-      { href: '/dashboard/aws/health', label: 'Infra Health', icon: Shield },
       { href: '/dashboard/aws/ec2', label: 'EC2 Instances', icon: Server },
       { href: '/dashboard/aws/rds', label: 'RDS Databases', icon: Database },
       { href: '/dashboard/aws/cache', label: 'ElastiCache', icon: HardDrive },

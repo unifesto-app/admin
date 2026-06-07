@@ -462,7 +462,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                       </span>
                       <div className="flex flex-col gap-1">
                         <span className="text-xs text-muted-foreground">
-                          {userRole.roleScope === 'PLATFORM' ? '🌐 Platform Role' : '📍 Space Role'}
+                          {userRole.roleScope === 'PLATFORM' ? 'Platform Role' : 'Space Role'}
                           {userRole.spaceId && (
                             <span className="ml-1 font-mono">• Space ID: {userRole.spaceId.substring(0, 8)}...</span>
                           )}
@@ -536,13 +536,13 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                     .filter(role => !userRoles.some(ur => ur.roleId === role.id))
                     .map((role) => (
                       <option key={role.id} value={role.id}>
-                        {role.scope === 'PLATFORM' ? '🌐' : '📍'} {role.name} • {role.scope}
+                        {role.name} • {role.scope}
                       </option>
                     ))}
                 </select>
                 {availableRoles.length === 0 ? (
                   <p className="text-xs text-amber-600 mt-2 flex items-center gap-1">
-                    <span>⚠️</span> All available roles have been assigned to this user
+                    All available roles have been assigned to this user
                   </p>
                 ) : (
                   <div className="mt-2 space-y-1">

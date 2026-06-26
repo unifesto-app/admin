@@ -218,7 +218,7 @@ export default function S3Page() {
                         >
                           <span className="font-mono truncate flex-1">{file.key}</span>
                           <div className="flex gap-3 ml-2 text-muted-foreground">
-                            <span>{file.sizeMB} MB</span>
+                            <span>{file.size ? (file.size / 1024 / 1024).toFixed(2) : '0'} MB</span>
                             <span>{new Date(file.lastModified).toLocaleDateString()}</span>
                           </div>
                         </div>

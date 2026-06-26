@@ -8,7 +8,10 @@
 import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
 
 // Backend API base URL
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
+const BACKEND_URL =
+  process.env.NEXT_PUBLIC_BACKEND_URL ||
+  process.env.NEXT_PUBLIC_API_URL ||
+  'http://localhost:4000';
 
 // Get token from cookie (primary) or localStorage (fallback)
 const getToken = (): string | null => {

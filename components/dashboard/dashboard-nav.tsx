@@ -28,7 +28,9 @@ import {
   Server,
   Mail,
   MessageSquare,
+  Inbox,
 } from 'lucide-react';
+
 
 const navSections = [
   {
@@ -42,6 +44,8 @@ const navSections = [
     items: [
       { href: '/dashboard/users', label: 'Users', icon: Users },
       { href: '/dashboard/spaces', label: 'Spaces', icon: Building2 },
+      { href: '/dashboard/spaces/requests', label: 'Space Requests', icon: Inbox },
+
     ],
   },
   {
@@ -87,6 +91,7 @@ const navSections = [
       { href: '/dashboard/aws/rds', label: 'RDS Databases', icon: Database },
       { href: '/dashboard/aws/cache', label: 'ElastiCache', icon: HardDrive },
       { href: '/dashboard/aws/s3', label: 'S3 Storage', icon: Cloud },
+      { href: '/dashboard/aws/ses', label: 'SES Email', icon: Mail },
       { href: '/dashboard/aws/billing', label: 'Billing & Cost', icon: DollarSign },
     ],
   },

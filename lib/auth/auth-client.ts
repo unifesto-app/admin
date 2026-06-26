@@ -7,7 +7,10 @@
 
 import axios, { AxiosInstance } from 'axios';
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
+const BACKEND_URL =
+  process.env.NEXT_PUBLIC_BACKEND_URL ||
+  process.env.NEXT_PUBLIC_API_URL ||
+  'http://localhost:4000';
 
 export interface UserProfile {
   id: string;

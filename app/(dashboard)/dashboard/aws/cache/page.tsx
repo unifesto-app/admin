@@ -233,7 +233,7 @@ export default function CachePage() {
                   <div className="ml-auto">
                     <p className="text-sm text-muted-foreground mb-1">Usage</p>
                     <p className="text-2xl font-bold">
-                      {Math.round((redis.info.usedMemoryMB / redis.info.maxMemoryMB) * 100)}%
+                      {redis.info.usedMemoryPercent}%
                     </p>
                   </div>
                 </div>
@@ -242,7 +242,7 @@ export default function CachePage() {
                   <div
                     className="h-full bg-red-500 transition-all"
                     style={{
-                      width: `${Math.round((redis.info.usedMemoryMB / redis.info.maxMemoryMB) * 100)}%`,
+                      width: `${redis.info.usedMemoryPercent}%`,
                     }}
                   />
                 </div>
